@@ -123,12 +123,28 @@ def run_download(task_id: str, url: str, format_type: str):
     try:
         download_progress[task_id] = {"status": "starting", "progress": 0}
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            ydl.download([url])
+            info = ydl.extract_info(url, download=True)
+            
+            # Final check to ensure we have the filepath
+            if task_id in download_progress:
+                task = download_progress[task_id]
+                if not task.get('filepath'):
+                    # Try to deduce filepath if hook missed it
+                    if 'requested_downloads' in info:
+                        filepath = info['requested_downloads'][0].get('filepath')
+                    else:
+                        filepath = ydl.prepare_filename(info)
+                    
+                    # Handle post-processing extension changes (basic check)
+                    if format_type == 'mp3' and filepath and not filepath.endswith('.mp3'):
+                        filepath = os.path.splitext(filepath)[0] + '.mp3'
+                        
+                    task['filepath'] = filepath
+                    task['filename'] = os.path.basename(filepath) if filepath else 'Unknown'
+
         if download_progress[task_id]["status"] != "finished":
              download_progress[task_id]["status"] = "finished"
              download_progress[task_id]["progress"] = 100
-
-        logger.info(f"Download finished for {task_id}")
 
     except Exception as e:
         logger.error(f"Error downloading {url}: {str(e)}")
