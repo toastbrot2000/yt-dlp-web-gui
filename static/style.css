@@ -48,11 +48,6 @@ body {
   padding: 40px;
   box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
   text-align: center;
-  transition: transform var(--transition-speed);
-}
-
-.card:hover {
-  transform: translateY(-5px);
 }
 
 h1 {
@@ -89,7 +84,7 @@ input[type="text"] {
   font-family: inherit;
   outline: none;
   transition:
-    border-color var(--transition-speed),
+    border-color var(--transition-speed);
     background var(--transition-speed);
   box-sizing: border-box; /* Ensure padding doesn't affect width */
 }
