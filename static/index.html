@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>yt-dlp Web GUI</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="card">
+        <h1><i class="fab fa-youtube"></i> yt-dlp Web GUI</h1>
+        <p class="subtitle">Premium Video & Audio Downloader</p>
+
+        <div class="input-group">
+          <input
+            type="text"
+            id="urlInput"
+            placeholder="Paste YouTube URL here..."
+            required
+          />
+          <i class="fas fa-link input-icon"></i>
+        </div>
+
+        <div class="options">
+          <label class="radio-container">
+            <input type="radio" name="format" value="mp4" checked />
+            <span class="radio-label"
+              ><i class="fas fa-video"></i> MP4 Video</span
+            >
+          </label>
+          <label class="radio-container">
+            <input type="radio" name="format" value="mp3" />
+            <span class="radio-label"
+              ><i class="fas fa-music"></i> MP3 Audio</span
+            >
+          </label>
+        </div>
+
+        <button id="downloadBtn" onclick="startDownload()">
+          <span id="btnText">Download</span>
+          <i class="fas fa-download" id="btnIcon"></i>
+          <div class="spinner" id="btnSpinner"></div>
+        </button>
+
+        <div id="statusContainer" class="status-container hidden">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="progressBar"></div>
+          </div>
+          <div class="status-text">
+            <span id="statusMessage">Initializing...</span>
+            <span id="percentage">0%</span>
+          </div>
+        </div>
+
+        <div id="errorContainer" class="error-container hidden">
+          <i class="fas fa-exclamation-circle"></i>
+          <span id="errorMessage"></span>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+  </body>
+</html>
