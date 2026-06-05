@@ -1,40 +1,14 @@
 # Contributing to yt-dlp Web GUI
 
-First off, thanks for taking the time to contribute! Contributions are what make the open-source community such an amazing place to learn, inspire, and create.
+Look, I built this in about 20 minutes. It’s essentially just a wrapper for yt-dlp, so let's keep things as simple as this thing.
+It's what I was looking for to self-host, didnt find anything this simple so I built it. It its of any value to you at all, Im of course extremely happy if you contribute.
 
-## How Can I Contribute?
+There are no strict coding standards, no Jira tickets, and no required formatting checks. This is just a couple LOC.
 
-### Reporting Bugs
-- Check the [Issues](https://github.com/your-username/yt-dlp-web-gui/issues) to see if the bug has already been reported.
-- If not, open a new issue. Clearly describe the problem and include steps to reproduce it.
+If you want to add a feature, fix a bug, or just make it look less terrible, I'm all for it. 
 
-### Suggesting Enhancements
-- Open an issue with the "enhancement" tag.
-- Describe the feature you'd like to see and why it would be useful.
+### How to contribute
 
-### Pull Requests
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature/your-feature`).
-3. Make your changes.
-4. Run linting:
-   - Python: `flake8 .`
-   - JS: `npm run lint`
-5. Commit your changes (`git commit -m 'Add some feature'`).
-6. Push to the branch (`git push origin feature/your-feature`).
-7. Open a Pull Request.
-
-## Coding Standards
-- Follow PEP 8 for Python code.
-- Use meaningful variable and function names.
-- Keep functions small and focused.
-- Document complex logic with comments.
-
-## Development Environment
-Ensure you have `ffmpeg` installed on your system as it is required for media processing.
-
-1. Clone your fork.
-2. Create a virtual environment: `python -m venv .venv`
-3. Activate it and install dependencies: `pip install -r requirements.txt`
-4. Run the development server: `python main.py`
-
-Thank you for contributing!
+1. **Fork it.**
+2. **Hack on it.** Change whatever you want.
+3. **Open a PR.** Just leave a quick note explaining what you changed and why. 
