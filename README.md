@@ -16,7 +16,7 @@ The easiest way to run the application is using Docker:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/your-username/yt-dlp-web-gui.git
+   git clone https://github.com/toastbrot2000/yt-dlp-web-gui.git
    cd yt-dlp-web-gui
    ```
 
