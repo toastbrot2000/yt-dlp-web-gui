@@ -1,4 +1,4 @@
-# Contributing to yt-dlp Web GUI
+# Contributing to very simple yt downloader
 
 Look, I built this in about 20 minutes. It’s essentially just a wrapper for yt-dlp, so let's keep things as simple as this thing.
 It's what I was looking for to self-host, didnt find anything this simple so I built it. It its of any value to you at all, Im of course extremely happy if you contribute.
