@@ -7,12 +7,34 @@ A lightweight, stateless web interface for `yt-dlp`. Download videos as MP4 or e
 - **Stateless Design:** Files are served directly to your browser and then deleted from the server.
 - **Background Cleanup:** Automatic garbage collection for abandoned or stale downloads.
 - **Rich UI:** Modern, responsive interface with real-time progress tracking.
-- **Dockerized:** Easy deployment using Docker and Docker Compose.
+- **Docker Ready:** Run instantly with a single command via Docker Hub.
 - **FFmpeg Integration:** Seamlessly handles audio conversion and video merging.
 
-## Quick Start (Docker)
+## Quick Start (Docker Hub)
 
-The easiest way to run the application is using Docker:
+You don't even need to clone this repository to run the app. Just create a `docker-compose.yml` file with the following content:
+
+```yaml
+services:
+  yt-dlp-web-gui:
+    image: toastbrotlf2000/yt-dlp-web-gui:latest
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./downloads:/app/downloads
+    restart: unless-stopped
+```
+
+Then run:
+```bash
+docker compose up -d
+```
+
+Access the UI at `http://localhost:8000`.
+
+## Build from Source
+
+If you want to contribute or modify the code:
 
 1. **Clone the repository:**
    ```bash
@@ -22,15 +44,12 @@ The easiest way to run the application is using Docker:
 
 2. **Run with Docker Compose:**
    ```bash
-   docker compose up -d
+   docker compose up -d --build
    ```
 
-3. **Access the Web UI:**
-   Open your browser and navigate to `http://localhost:8000`.
+## Local Development (No Docker)
 
-## Local Development
-
-If you prefer to run it without Docker, ensure you have `ffmpeg` installed on your system.
+Ensure you have `ffmpeg` installed on your system.
 
 1. **Install Python dependencies:**
    ```bash
@@ -67,7 +86,7 @@ This project is a wrapper around several incredible open-source tools:
 
 - **[yt-dlp](https://github.com/yt-dlp/yt-dlp):** Licensed under The Unlicense. The engine that makes downloading possible.
 - **[FastAPI](https://fastapi.tiangolo.com/):** Licensed under MIT. The high-performance backend.
-- **[FFmpeg](https://ffmpeg.org/):** Licensed under LGPL/GPL. Used for media conversion and merging. (Note: This project does not distribute FFmpeg; it must be installed on the host or used via the provided Docker image).
+- **[FFmpeg](https://ffmpeg.org/):** Licensed under LGPL/GPL. Used for media conversion and merging.
 - **[Font Awesome](https://fontawesome.com/):** Icons used under the CC BY 4.0 license.
 - **[Outfit Font](https://fonts.google.com/specimen/Outfit):** Used under the Open Font License.
 

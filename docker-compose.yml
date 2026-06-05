@@ -2,7 +2,9 @@ version: '3.8'
 
 services:
   yt-dlp-web-gui:
-    image: toastbrot2000/yt-dlp-web-gui:latest
+    image: toastbrotlf2000/yt-dlp-web-gui:latest
+
+
     build: .
     ports:
       - "8000:8000"
