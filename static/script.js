@@ -1,5 +1,16 @@
 document.addEventListener("DOMContentLoaded", () => {
-  // Initialization if needed
+  const formatRadios = document.querySelectorAll('input[name="format"]');
+  const qualityGroup = document.getElementById("qualityGroup");
+
+  formatRadios.forEach((radio) => {
+    radio.addEventListener("change", (e) => {
+      if (e.target.value === "mp4") {
+        qualityGroup.classList.remove("hidden");
+      } else {
+        qualityGroup.classList.add("hidden");
+      }
+    });
+  });
 });
 
 // eslint-disable-next-line no-unused-vars
@@ -7,6 +18,7 @@ async function startDownload() {
   const urlInput = document.getElementById("urlInput");
   const url = urlInput.value.trim();
   const format = document.querySelector('input[name="format"]:checked').value;
+  const quality = document.getElementById("qualitySelect").value;
 
   const downloadBtn = document.getElementById("downloadBtn");
   const btnText = document.getElementById("btnText");
@@ -43,7 +55,7 @@ async function startDownload() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ url, format_type: format }),
+      body: JSON.stringify({ url, format_type: format, quality: quality }),
     });
 
     if (!response.ok) {

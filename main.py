@@ -131,8 +131,8 @@ def progress_hook(d, task_id):
         logger.info(f"Task {task_id} download finished, now processing.")
 
 
-def run_download(task_id: str, url: str, format_type: str):
-    logger.info(f"Starting download for {url} as {format_type} (Task ID: {task_id})")
+def run_download(task_id: str, url: str, format_type: str, quality: str = "best"):
+    logger.info(f"Starting download for {url} as {format_type} ({quality}) (Task ID: {task_id})")
     
     def postprocessor_hook(d):
         if d['status'] == 'finished':
@@ -163,8 +163,16 @@ def run_download(task_id: str, url: str, format_type: str):
             }],
         })
     else:  # mp4
+        if quality == "best":
+            ydl_opts.update({
+                'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
+            })
+        else:
+            # target height like 1080, 720, 480
+            ydl_opts.update({
+                'format': f'bestvideo[height<={quality}][ext=mp4]+bestaudio[ext=m4a]/best[height<={quality}][ext=mp4]/best',
+            })
         ydl_opts.update({
-            'format': 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
             'merge_output_format': 'mp4',
         })
 
@@ -214,7 +222,7 @@ def run_download(task_id: str, url: str, format_type: str):
 @app.post("/api/download")
 async def start_download(request: DownloadRequest, background_tasks: BackgroundTasks):
     task_id = str(uuid.uuid4())
-    background_tasks.add_task(run_download, task_id, request.url, request.format_type)
+    background_tasks.add_task(run_download, task_id, request.url, request.format_type, request.quality)
     return {"task_id": task_id}
 
 @app.get("/api/progress/{task_id}")

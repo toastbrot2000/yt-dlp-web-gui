@@ -73,7 +73,7 @@ h1 i {
   margin-bottom: 20px;
 }
 
-input[type="text"] {
+input[type="text"], select {
   width: 100%;
   padding: 15px 15px 15px 45px;
   background: var(--input-bg);
@@ -86,11 +86,21 @@ input[type="text"] {
   transition:
     border-color var(--transition-speed);
   box-sizing: border-box; /* Ensure padding doesn't affect width */
+  appearance: none; /* Remove default arrow */
 }
 
-input[type="text"]:focus {
+input[type="text"]:focus, select:focus {
   border-color: var(--primary-color);
   background: rgba(255, 255, 255, 0.15);
+}
+
+select {
+  cursor: pointer;
+}
+
+select option {
+  background-color: var(--bg-color);
+  color: #fff;
 }
 
 .input-icon {
