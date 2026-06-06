@@ -1,10 +1,10 @@
-# yt-dlp Web GUI
+# very simple yt downloader
 
-A lightweight, stateless web interface for `yt-dlp`. Download videos as MP4 or extract audio as MP3 directly from your browser.
+A lightweight, stateless-ish web interface for `yt-dlp`. Download videos as MP4 or extract audio as MP3 directly from your browser.
 
 ## Features
 
-- **Stateless Design:** Files are served directly to your browser and then deleted from the server.
+- **Stateless-ish Design:** Files are served directly to your browser and then deleted from the server.
 - **Background Cleanup:** Automatic garbage collection for abandoned or stale downloads.
 - **Rich UI:** Modern, responsive interface with real-time progress tracking.
 - **Docker Ready:** Run instantly with a single command via Docker Hub.
@@ -38,7 +38,7 @@ If you want to contribute or modify the code:
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/toastbrot2000/yt-dlp-web-gui.git
+   git clone https://github.com/toastbrot2000/very-simple-yt-downloader.git
    cd yt-dlp-web-gui
    ```
 

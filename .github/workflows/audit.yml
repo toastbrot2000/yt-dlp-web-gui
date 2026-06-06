@@ -6,6 +6,9 @@ on:
   schedule:
     - cron: "0 0 * * 1" # Every Monday at 00:00
 
+permissions:
+  contents: read
+
 jobs:
   security-audit:
     runs-on: ubuntu-latest

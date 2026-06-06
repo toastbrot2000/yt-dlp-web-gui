@@ -67,7 +67,7 @@ def cleanup_file(path: str, task_id: str = None):
     if task_id and task_id in download_progress:
         del download_progress[task_id]
 
-# CORS (optional for local dev but good practice)
+# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
