@@ -31,9 +31,12 @@ async function startDownload() {
   const percentage = document.getElementById("percentage");
   const errorContainer = document.getElementById("errorContainer");
   const errorMessage = document.getElementById("errorMessage");
+  const noticeContainer = document.getElementById("noticeContainer");
+  const noticeMessage = document.getElementById("noticeMessage");
 
   // Reset UI
   errorContainer.classList.add("hidden");
+  noticeContainer.classList.add("hidden");
   statusContainer.classList.add("hidden");
   progressBar.style.width = "0%";
 
@@ -58,12 +61,21 @@ async function startDownload() {
       body: JSON.stringify({ url, format_type: format, quality: quality }),
     });
 
+    const data = await response.json().catch(() => ({}));
+
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      // FastAPI puts validation/refusal messages in `detail`.
+      showError(data.detail || `Request failed (status ${response.status})`);
+      resetButton();
+      return;
     }
 
-    const data = await response.json();
     const taskId = data.task_id;
+
+    // Non-blocking heads-up (e.g. a single video pulled out of a playlist/mix).
+    if (data.notice) {
+      showNotice(data.notice);
+    }
 
     // Start Polling
     statusContainer.classList.remove("hidden");
@@ -76,6 +88,11 @@ async function startDownload() {
   function showError(msg) {
     errorContainer.classList.remove("hidden");
     errorMessage.textContent = msg;
+  }
+
+  function showNotice(msg) {
+    noticeContainer.classList.remove("hidden");
+    noticeMessage.textContent = msg;
   }
 
   function resetButton() {

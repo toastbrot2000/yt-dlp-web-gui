@@ -98,6 +98,33 @@ class DownloadRequest(BaseModel):
     quality: str = "best" # "best", "1080", "720", "480"
 
 
+def inspect_url(url: str):
+    """Inspect a URL for single-video vs. playlist/mix context.
+
+    Returns (has_video, is_playlist_context):
+      has_video           - the URL points at a specific video we can grab on its own
+      is_playlist_context - the URL also carries a playlist or mix (list= / /playlist)
+    """
+    try:
+        parsed = urllib.parse.urlparse(url)
+        qs = urllib.parse.parse_qs(parsed.query)
+    except Exception:
+        # If we can't parse it, don't block — let yt-dlp decide.
+        return (True, False)
+
+    host = (parsed.netloc or "").lower()
+    path = parsed.path or ""
+
+    has_video = bool(qs.get("v"))
+    if "youtu.be" in host and path.strip("/"):
+        has_video = True  # youtu.be/<id>
+    if path.startswith("/shorts/") or path.startswith("/embed/"):
+        has_video = True
+
+    is_playlist_context = bool(qs.get("list")) or path.startswith("/playlist")
+    return (has_video, is_playlist_context)
+
+
 def progress_hook(d, task_id):
     if d['status'] == 'downloading':
         # Use total_bytes or downloaded_bytes for more accurate percentage if percent_str is unreliable
@@ -151,6 +178,8 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
         'postprocessor_hooks': [postprocessor_hook],
         'quiet': True,
         'no_warnings': True,
+        # Only the single video, even if the URL carries a playlist/mix context.
+        'noplaylist': True,
     }
 
     if format_type == 'mp3':
@@ -221,9 +250,25 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
 
 @app.post("/api/download")
 async def start_download(request: DownloadRequest, background_tasks: BackgroundTasks):
+    has_video, is_playlist = inspect_url(request.url)
+
+    # A pure playlist/mix (no single video to fall back to) isn't supported yet.
+    if is_playlist and not has_video:
+        raise HTTPException(
+            status_code=400,
+            detail="Playlists and mixes aren't supported yet. Please paste a link to a single video.",
+        )
+
     task_id = str(uuid.uuid4())
     background_tasks.add_task(run_download, task_id, request.url, request.format_type, request.quality)
-    return {"task_id": task_id}
+
+    response = {"task_id": task_id}
+    if is_playlist and has_video:
+        response["notice"] = (
+            "This link is part of a playlist/mix. Only the single video will be "
+            "downloaded for now. Full playlist support is coming later."
+        )
+    return response
 
 @app.get("/api/progress/{task_id}")
 async def get_progress(task_id: str):
