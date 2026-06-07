@@ -10,6 +10,10 @@ A lightweight, stateless-ish web interface for `yt-dlp`. Download videos as MP4 
 - **Docker Ready:** Run instantly with a single command via Docker Hub.
 - **FFmpeg Integration:** Seamlessly handles audio conversion and video merging.
 
+<img width="889" height="857" alt="image" src="https://github.com/user-attachments/assets/aa8255ec-c465-4b75-94ab-bf6899238187" />
+
+<img width="1186" height="882" alt="image" src="https://github.com/user-attachments/assets/d25d35fd-480a-4c4f-a172-8bdc6b6a3661" />
+
 ## Quick Start (Docker Hub)
 
 You don't even need to clone this repository to run the app. Just create a `docker-compose.yml` file with the following content:
