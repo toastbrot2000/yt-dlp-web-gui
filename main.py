@@ -232,11 +232,20 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
     if format_type == 'mp3':
         ydl_opts.update({
             'format': 'bestaudio/best',
-            'postprocessors': [{
-                'key': 'FFmpegExtractAudio',
-                'preferredcodec': 'mp3',
-                'preferredquality': '192',
-            }],
+            # Grab the thumbnail so EmbedThumbnail can use it as cover art.
+            'writethumbnail': True,
+            'postprocessors': [
+                {
+                    'key': 'FFmpegExtractAudio',
+                    'preferredcodec': 'mp3',
+                    'preferredquality': '192',
+                },
+                # Write title/artist/date/etc. that yt-dlp scraped into the file's
+                # tags. 'artist' falls back through uploader automatically.
+                {'key': 'FFmpegMetadata', 'add_metadata': True},
+                # Embed the thumbnail as ID3 cover art (runs after extraction).
+                {'key': 'EmbedThumbnail'},
+            ],
         })
     else:  # mp4
         # result into an mp4 container regardless of source codec.
@@ -251,6 +260,14 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
             })
         ydl_opts.update({
             'merge_output_format': 'mp4',
+            # Grab the thumbnail so EmbedThumbnail can set the MP4 cover atom.
+            'writethumbnail': True,
+            'postprocessors': [
+                # Write title/artist/date/etc. into the container tags.
+                {'key': 'FFmpegMetadata', 'add_metadata': True},
+                # Embed the thumbnail into the MP4 'covr' atom.
+                {'key': 'EmbedThumbnail'},
+            ],
         })
 
     try:
