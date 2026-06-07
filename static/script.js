@@ -19,6 +19,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const formatRadios = document.querySelectorAll('input[name="format"]');
   const qualityGroup = document.getElementById("qualityGroup");
   const qualitySelect = document.getElementById("qualitySelect");
+  const qualityIcon = document.getElementById("qualityIcon");
+  const qualitySpinner = document.getElementById("qualitySpinner");
+  const videoInfo = document.getElementById("videoInfo");
   const urlInput = document.getElementById("urlInput");
 
   // The options the page ships with; used as a fallback when probing fails.
@@ -38,6 +41,28 @@ document.addEventListener("DOMContentLoaded", () => {
     if (placeholder) {
       qualitySelect.innerHTML = `<option value="best">${placeholder}</option>`;
     }
+  }
+
+  // Swap the sliders icon for a spinner while a probe is in flight.
+  function setProbing(probing) {
+    qualityIcon.classList.toggle("hidden", probing);
+    qualitySpinner.classList.toggle("hidden", !probing);
+  }
+
+  // The probe doubles as a validity check: a resolved title means the link is a
+  // real, reachable video; a failure means we couldn't verify it.
+  // state: "valid" | "invalid" | "hidden". `text` is rendered safely.
+  function setVideoInfo(state, text) {
+    if (!videoInfo) return;
+    if (state === "hidden") {
+      videoInfo.className = "video-info hidden";
+      videoInfo.textContent = "";
+      return;
+    }
+    const icon = state === "valid" ? "fa-circle-check" : "fa-circle-exclamation";
+    videoInfo.className = `video-info ${state}`;
+    videoInfo.innerHTML = `<i class="fas ${icon}"></i><span class="title"></span>`;
+    videoInfo.querySelector(".title").textContent = text; // textContent = no HTML injection
   }
 
   function populateOptions(heights) {
@@ -60,20 +85,26 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // Cancel any in-flight probe for an older URL.
     if (probeController) probeController.abort();
-    probeController = new AbortController();
+    const controller = new AbortController();
+    probeController = controller;
 
     setSelectState(true, "Loading available qualities…");
+    setProbing(true);
+    setVideoInfo("hidden");
 
     try {
       const res = await fetch("/api/formats", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
-        signal: probeController.signal,
+        signal: controller.signal,
       });
 
       if (!res.ok) throw new Error("probe failed");
       const data = await res.json();
+
+      // A resolved title confirms the link is a real, reachable video.
+      setVideoInfo("valid", data.title || "Video found");
 
       if (data.heights && data.heights.length) {
         populateOptions(data.heights);
@@ -84,19 +115,36 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     } catch (err) {
       if (err.name === "AbortError") return;
-      // Probe failed: restore the static list. The backend's height<= filter
-      // still degrades gracefully if a chosen resolution isn't available.
+      // Probe failed: restore the static list (the backend's height<= filter
+      // still degrades gracefully) and flag that we couldn't verify the link.
       lastProbedUrl = null; // allow a retry on next change
       qualitySelect.innerHTML = defaultOptionsHtml;
       qualitySelect.disabled = false;
+      setVideoInfo(
+        "invalid",
+        "Couldn't verify this link. it may be private, removed, or not a supported video.",
+      );
+    } finally {
+      // Only clear the spinner if a newer probe hasn't already taken over.
+      if (probeController === controller) setProbing(false);
     }
   }
 
   // The selector is only meaningful once we have a link to probe, so keep it
   // hidden until MP4 is chosen *and* a URL has been entered.
   function updateQualityVisibility() {
-    const show = isMp4Selected() && urlInput.value.trim() !== "";
+    const url = urlInput.value.trim();
+    const show = isMp4Selected() && url !== "";
     qualityGroup.classList.toggle("hidden", !show);
+
+    // Reveal straight into the spinner state for any URL we haven't probed yet,
+    // so the group never flashes the static slider icon + default list during
+    // the input debounce. Already-probed URLs keep their populated options.
+    if (show && url !== lastProbedUrl) {
+      setSelectState(true, "Loading available qualities…");
+      setProbing(true);
+      setVideoInfo("hidden");
+    }
   }
 
   function maybeProbe() {

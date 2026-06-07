@@ -96,6 +96,11 @@ download_progress: Dict[str, Dict[str, Any]] = {}
 FORMAT_CACHE_TTL = 600  # seconds
 format_cache: Dict[str, Dict[str, Any]] = {}
 
+# Restrict yt-dlp to sites with a dedicated extractor. Dropping the catch-all
+# "generic" extractor means an unsupported URL fails instantly instead of the
+# server fetching and scraping the arbitrary page (an SSRF surface + slow miss).
+ALLOWED_EXTRACTORS = ['default', '-generic']
+
 
 class DownloadRequest(BaseModel):
     url: str
@@ -145,6 +150,9 @@ def probe_heights(url: str):
         'no_warnings': True,
         'noplaylist': True,
         'skip_download': True,
+        # Bound the probe so a slow/unresponsive host can't tie up a worker.
+        'socket_timeout': 8,
+        'allowed_extractors': ALLOWED_EXTRACTORS,
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
@@ -217,6 +225,8 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
         'no_warnings': True,
         # Only the single video, even if the URL carries a playlist/mix context.
         'noplaylist': True,
+        # Supported sites only — no arbitrary page fetching (see ALLOWED_EXTRACTORS).
+        'allowed_extractors': ALLOWED_EXTRACTORS,
     }
 
     if format_type == 'mp3':
