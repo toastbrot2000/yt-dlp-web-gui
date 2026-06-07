@@ -41,10 +41,14 @@ Access the UI at `http://localhost:8000`.
 If you're not into self-hosting, you can still run this without touching the console or code using Docker Desktop: 
 1. Install Docker Desktop: https://www.docker.com/products/docker-desktop/
 2. Run Docker Desktop and in the top search bar search for "toastbrotlf2000/yt-dlp-web-gui"
-3. Click "Run" on the image in the result
-4. Optionally give it a name, path and a port (default is 8000)
-5. Click "Run"
-6. You can now go to any browser on the same computer and access the UI at `http://localhost:8000`
+<img width="986" height="431" alt="image" src="https://github.com/user-attachments/assets/3fbbdc7a-28bd-4f79-96c9-de7fa77dad4c" />
+
+4. Click "Run" on the image in the result
+5. Optionally give it a name, path and a port (default is 8000)
+6. Click "Run"
+<img width="706" height="649" alt="image" src="https://github.com/user-attachments/assets/4a094b98-d73e-4f80-b2c8-5d9668f7fae5" />
+
+8. You can now go to any browser on the same computer and access the UI at `http://localhost:8000`
 
 ## Build from Source
 
