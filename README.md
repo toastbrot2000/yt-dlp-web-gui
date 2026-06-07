@@ -53,7 +53,6 @@ If you want to contribute or modify the code:
 1. **Clone the repository:**
    ```bash
    git clone https://github.com/toastbrot2000/very-simple-yt-downloader.git
-   cd yt-dlp-web-gui
    ```
 
 2. **Run with Docker Compose:**
@@ -90,7 +89,6 @@ Future goals for this project include:
 - [ ] **Playlist Support:** Ability to download entire YouTube playlists.
 - [ ] **Advanced Format Selection:** UI to choose specific video/audio codecs.
 - [ ] **Authentication:** Optional basic auth for private deployments.
-- [ ] **Dark Mode / Themes:** Customizable UI aesthetics.
 - [ ] **Mobile App PWA:** Make the web interface a fully installable Progressive Web App.
 - [ ] **Download History:** Optional local-storage based history (keeping the server stateless).
 
