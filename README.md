@@ -36,6 +36,16 @@ docker compose up -d
 
 Access the UI at `http://localhost:8000`.
 
+## Non-Technical Start (Docker Desktop)
+
+If you're not into self-hosting, you can still run this without touching the console or code using Docker Desktop: 
+1. Install Docker Desktop: https://www.docker.com/products/docker-desktop/
+2. Run Docker Desktop and in the top search bar search for "toastbrotlf2000/yt-dlp-web-gui"
+3. Click "Run" on the image in the result
+4. Optionally give it a name, path and a port (default is 8000)
+5. Click "Run"
+6. You can now go to any browser on the same computer and access the UI at `http://localhost:8000`
+
 ## Build from Source
 
 If you want to contribute or modify the code:
