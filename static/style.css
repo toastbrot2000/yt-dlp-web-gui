@@ -1,8 +1,4 @@
-/* ============================================================
-   very simple yt downloader — refined minimal dark
-   Type: Hanken Grotesk (sans, throughout)
-   Accent (pink/red) used surgically: focus, active toggle, progress.
-   ============================================================ */
+/* very simple yt downloader, minimal dark theme, hanken grotesk + pink accent */
 
 :root {
   /* surfaces */
@@ -64,7 +60,7 @@ body {
   line-height: 1.5;
   color: var(--text);
   background-color: var(--bg);
-  /* atmosphere: one faint off-axis accent wash, not twin glows */
+  /* one faint off-axis accent wash */
   background-image:
     radial-gradient(
       120% 90% at 100% 0%,
@@ -81,7 +77,7 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* fine grain overlay for texture/depth */
+/* grain overlay for texture */
 .grain {
   position: fixed;
   inset: 0;
@@ -92,7 +88,7 @@ body {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* ---------------------------------------------------------- layout */
+/* layout */
 
 .container {
   position: relative;
@@ -112,7 +108,7 @@ body {
     0 40px 80px -40px rgba(0, 0, 0, 0.9);
 }
 
-/* hairline highlight along the top edge */
+/* highlight along the top edge */
 .card::before {
   content: "";
   position: absolute;
@@ -128,7 +124,7 @@ body {
   );
 }
 
-/* ---------------------------------------------------------- header */
+/* header */
 
 .head {
   margin-bottom: 30px;
@@ -161,7 +157,7 @@ h1 {
   line-height: 1.55;
 }
 
-/* ---------------------------------------------------------- fields */
+/* fields */
 
 .field {
   margin-bottom: 20px;
@@ -267,7 +263,7 @@ select option {
   animation: spin 0.7s linear infinite;
 }
 
-/* probe result line: confirms a valid video, or flags an unverifiable link */
+/* probe result line: valid video or unverifiable link */
 .video-info {
   display: flex;
   align-items: center;
@@ -302,7 +298,7 @@ select option {
   color: var(--notice);
 }
 
-/* ---------------------------------------------------- format toggle */
+/* format toggle */
 
 .options {
   display: grid;
@@ -371,7 +367,7 @@ select option {
   border-color: var(--accent-line);
 }
 
-/* ---------------------------------------------------------- button */
+/* button */
 
 button#downloadBtn {
   width: 100%;
@@ -427,7 +423,7 @@ button#downloadBtn:focus-visible {
   box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent-line);
 }
 
-/* ---------------------------------------------------------- spinners */
+/* spinners */
 
 .spinner {
   display: none;
@@ -454,7 +450,7 @@ button#downloadBtn:focus-visible {
   }
 }
 
-/* ---------------------------------------------------- status / progress */
+/* status / progress */
 
 .status-container {
   margin-top: 26px;
@@ -517,7 +513,7 @@ button#downloadBtn:focus-visible {
   color: var(--text-dim);
 }
 
-/* ---------------------------------------------------- notice / error */
+/* notice / error */
 
 .notice-container,
 .error-container {
@@ -550,7 +546,7 @@ button#downloadBtn:focus-visible {
   color: var(--danger);
 }
 
-/* ---------------------------------------------------------- footer */
+/* footer */
 
 .foot {
   margin: 22px 0 0;
@@ -561,13 +557,13 @@ button#downloadBtn:focus-visible {
   color: var(--text-faint);
 }
 
-/* ---------------------------------------------------------- utility */
+/* utility */
 
 .hidden {
   display: none !important;
 }
 
-/* ---------------------------------------------------------- motion */
+/* motion */
 
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -579,7 +575,7 @@ button#downloadBtn:focus-visible {
   }
 }
 
-/* ---------------------------------------------------------- responsive */
+/* responsive */
 
 @media (max-width: 420px) {
   .card {

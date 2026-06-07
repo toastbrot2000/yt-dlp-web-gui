@@ -4,7 +4,7 @@ import logging
 import asyncio
 import time
 import urllib.parse
-from typing import Dict, Any
+from typing import Dict, Any, Literal
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, BackgroundTasks, HTTPException
@@ -14,11 +14,10 @@ from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import yt_dlp
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Cleanup task: Delete files older than 1 hour
+# delete downloaded files and task entries older than 1 hour
 async def cleanup_loop():
     while True:
         try:
@@ -26,12 +25,10 @@ async def cleanup_loop():
             for filename in os.listdir(DOWNLOAD_DIR):
                 filepath = os.path.join(DOWNLOAD_DIR, filename)
                 if os.path.isfile(filepath):
-                    # If file is older than 1 hour
                     if now - os.path.getmtime(filepath) > 3600:
                         os.remove(filepath)
                         logger.info(f"Cleanup: Deleted stale file {filename}")
-            
-            # Also cleanup stale task progress entries (older than 1 hour)
+
             stale_tasks = []
             for tid, data in download_progress.items():
                 if data.get("timestamp") and now - data["timestamp"] > 3600:
@@ -43,19 +40,16 @@ async def cleanup_loop():
 
         except Exception as e:
             logger.error(f"Cleanup error: {e}")
-        
-        await asyncio.sleep(600) # Run every 10 minutes
+
+        await asyncio.sleep(600)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: Start cleanup loop
     asyncio.create_task(cleanup_loop())
     yield
-    # Shutdown: Cleanup (optional)
 
 app = FastAPI(title="yt-dlp Web GUI", lifespan=lifespan)
 
-# Helper to remove file after download
 def cleanup_file(path: str, task_id: str = None):
     try:
         if os.path.exists(path):
@@ -67,7 +61,6 @@ def cleanup_file(path: str, task_id: str = None):
     if task_id and task_id in download_progress:
         del download_progress[task_id]
 
-# CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -76,36 +69,28 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create downloads directory
 DOWNLOAD_DIR = os.path.join(os.getcwd(), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# Create static directory if it doesn't exist
 STATIC_DIR = os.path.join(os.getcwd(), "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
 
-# Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Store active downloads progress
 download_progress: Dict[str, Dict[str, Any]] = {}
 
-# Cache of probed formats so repeated polls for the same URL don't hit the
-# source site again (cuts latency and bot-detection/rate-limit exposure).
-# url -> { "heights": list[int], "title": str, "timestamp": float }
-FORMAT_CACHE_TTL = 600  # seconds
+# cache probed formats so repeated polls for a url don't re-hit the source site
+FORMAT_CACHE_TTL = 600
 format_cache: Dict[str, Dict[str, Any]] = {}
 
-# Restrict yt-dlp to sites with a dedicated extractor. Dropping the catch-all
-# "generic" extractor means an unsupported URL fails instantly instead of the
-# server fetching and scraping the arbitrary page (an SSRF surface + slow miss).
+# drop the catch-all generic extractor so unsupported urls fail fast (no ssrf surface)
 ALLOWED_EXTRACTORS = ['default', '-generic']
 
 
 class DownloadRequest(BaseModel):
     url: str
-    format_type: str  # "mp4" or "mp3"
-    quality: str = "best" # "best", "2160", "1440", "1080", "720", "480"
+    format_type: str  # mp4 or mp3
+    quality: str = "best"  # best, 2160, 1440, 1080, 720, 480
 
 
 class FormatsRequest(BaseModel):
@@ -113,17 +98,12 @@ class FormatsRequest(BaseModel):
 
 
 def inspect_url(url: str):
-    """Inspect a URL for single-video vs. playlist/mix context.
-
-    Returns (has_video, is_playlist_context):
-      has_video           - the URL points at a specific video we can grab on its own
-      is_playlist_context - the URL also carries a playlist or mix (list= / /playlist)
-    """
+    """returns (has_video, is_playlist_context) for the given url."""
     try:
         parsed = urllib.parse.urlparse(url)
         qs = urllib.parse.parse_qs(parsed.query)
     except Exception:
-        # If we can't parse it, don't block — let yt-dlp decide.
+        # if we can't parse it, let yt-dlp decide
         return (True, False)
 
     host = (parsed.netloc or "").lower()
@@ -140,24 +120,20 @@ def inspect_url(url: str):
 
 
 def probe_heights(url: str):
-    """Extract metadata for a URL (no download) and return available video heights.
-
-    Returns (title, heights) where heights is a sorted-descending list of the
-    distinct vertical resolutions the source offers. Raises on extraction error.
-    """
+    """returns (title, heights) for a url without downloading; raises on extraction error."""
     opts = {
         'quiet': True,
         'no_warnings': True,
         'noplaylist': True,
         'skip_download': True,
-        # Bound the probe so a slow/unresponsive host can't tie up a worker.
+        # bound the probe so a slow host can't tie up a worker
         'socket_timeout': 8,
         'allowed_extractors': ALLOWED_EXTRACTORS,
     }
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(url, download=False)
 
-    # A playlist/mix URL yields entries; probe the first concrete video.
+    # a playlist/mix url yields entries; probe the first concrete video
     if info.get('entries'):
         entries = [e for e in info['entries'] if e]
         info = entries[0] if entries else info
@@ -172,7 +148,7 @@ def probe_heights(url: str):
 
 def progress_hook(d, task_id):
     if d['status'] == 'downloading':
-        # Use total_bytes or downloaded_bytes for more accurate percentage if percent_str is unreliable
+        # prefer byte counts over percent_str, which can be unreliable
         downloaded = d.get('downloaded_bytes', 0)
         total = d.get('total_bytes') or d.get('total_bytes_estimate')
         
@@ -193,7 +169,7 @@ def progress_hook(d, task_id):
             "eta": d.get('_eta_str', 'N/A')
         })
     elif d['status'] == 'finished':
-        # Download is done, but post-processing might start
+        # download done, post-processing may still run
         download_progress[task_id].update({
             "status": "processing",
             "progress": 100,
@@ -223,16 +199,15 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
         'postprocessor_hooks': [postprocessor_hook],
         'quiet': True,
         'no_warnings': True,
-        # Only the single video, even if the URL carries a playlist/mix context.
+        # single video only, even if the url carries a playlist/mix
         'noplaylist': True,
-        # Supported sites only — no arbitrary page fetching (see ALLOWED_EXTRACTORS).
         'allowed_extractors': ALLOWED_EXTRACTORS,
     }
 
     if format_type == 'mp3':
         ydl_opts.update({
             'format': 'bestaudio/best',
-            # Grab the thumbnail so EmbedThumbnail can use it as cover art.
+            # needed so EmbedThumbnail can use it as cover art
             'writethumbnail': True,
             'postprocessors': [
                 {
@@ -240,32 +215,28 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
                     'preferredcodec': 'mp3',
                     'preferredquality': '192',
                 },
-                # Write title/artist/date/etc. that yt-dlp scraped into the file's
-                # tags. 'artist' falls back through uploader automatically.
+                # write scraped title/artist/date/etc into the file tags
                 {'key': 'FFmpegMetadata', 'add_metadata': True},
-                # Embed the thumbnail as ID3 cover art (runs after extraction).
+                # embed the thumbnail as id3 cover art
                 {'key': 'EmbedThumbnail'},
             ],
         })
     else:  # mp4
-        # result into an mp4 container regardless of source codec.
         if quality == "best":
             ydl_opts.update({
                 'format': 'bestvideo+bestaudio/best',
             })
         else:
-            # target height like 2160, 1440, 1080, 720, 480
+            # cap at target height like 2160, 1440, 1080, 720, 480
             ydl_opts.update({
                 'format': f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]/best',
             })
         ydl_opts.update({
             'merge_output_format': 'mp4',
-            # Grab the thumbnail so EmbedThumbnail can set the MP4 cover atom.
             'writethumbnail': True,
             'postprocessors': [
-                # Write title/artist/date/etc. into the container tags.
                 {'key': 'FFmpegMetadata', 'add_metadata': True},
-                # Embed the thumbnail into the MP4 'covr' atom.
+                # embed the thumbnail into the mp4 covr atom
                 {'key': 'EmbedThumbnail'},
             ],
         })
@@ -278,30 +249,29 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
         }
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=True)
-            
-            # Final check to ensure we have the filepath
+
+            # deduce filepath if the hooks missed it
             if task_id in download_progress:
                 task = download_progress[task_id]
                 if not task.get('filepath'):
-                    # Try to deduce filepath if hook missed it
                     if 'requested_downloads' in info:
                         filepath = info['requested_downloads'][0].get('filepath')
                     else:
                         filepath = ydl.prepare_filename(info)
-                    
-                    # Handle post-processing extension changes
+
+                    # account for the mp3 extension swap from post-processing
                     if format_type == 'mp3' and filepath and not filepath.endswith('.mp3'):
                         filepath = os.path.splitext(filepath)[0] + '.mp3'
-                        
+
                     task['filepath'] = filepath
                     task['filename'] = os.path.basename(filepath) if filepath else 'Unknown'
 
-        # Set final status to finished ONLY after the context manager exits (all post-processing done)
+        # mark finished only after the context manager exits, once post-processing is done
         if task_id in download_progress:
             download_progress[task_id].update({
                 "status": "finished",
                 "progress": 100,
-                "timestamp": time.time() # Update timestamp so it survives 1 more hour
+                "timestamp": time.time()
             })
 
     except Exception as e:
@@ -317,7 +287,7 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
 async def start_download(request: DownloadRequest, background_tasks: BackgroundTasks):
     has_video, is_playlist = inspect_url(request.url)
 
-    # A pure playlist/mix (no single video to fall back to) isn't supported yet.
+    # a pure playlist/mix with no single video to fall back to isn't supported yet
     if is_playlist and not has_video:
         raise HTTPException(
             status_code=400,
@@ -341,13 +311,13 @@ async def get_formats(request: FormatsRequest):
     if not url:
         raise HTTPException(status_code=400, detail="No URL provided.")
 
-    # Serve from cache when fresh to avoid re-probing the source.
+    # serve from cache when fresh to avoid re-probing the source
     cached = format_cache.get(url)
     if cached and time.time() - cached["timestamp"] < FORMAT_CACHE_TTL:
         return {"title": cached["title"], "heights": cached["heights"]}
 
     try:
-        # Extraction is blocking/network-bound; keep the event loop responsive.
+        # extraction is blocking and network-bound, keep the event loop responsive
         title, heights = await asyncio.to_thread(probe_heights, url)
     except Exception as e:
         logger.error(f"Format probe failed for {url}: {e}")
@@ -383,11 +353,11 @@ async def download_file(task_id: str, background_tasks: BackgroundTasks):
     
     file_path = task["filepath"]
     filename = os.path.basename(file_path)
-    
-    # URL-encode the filename for the Content-Disposition header (RFC 5987)
+
+    # url-encode the filename for the content-disposition header (rfc 5987)
     encoded_filename = urllib.parse.quote(filename)
-    
-    # Schedule cleanup after response is sent
+
+    # clean up the file after the response is sent
     background_tasks.add_task(cleanup_file, file_path, task_id)
 
     return FileResponse(

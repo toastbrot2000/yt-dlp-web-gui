@@ -1,4 +1,4 @@
-// Friendly labels for known YouTube resolution buckets.
+// labels for known resolution buckets
 const HEIGHT_LABELS = {
   4320: "8K (4320p)",
   2160: "4K (2160p)",
@@ -24,7 +24,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const videoInfo = document.getElementById("videoInfo");
   const urlInput = document.getElementById("urlInput");
 
-  // The options the page ships with; used as a fallback when probing fails.
+  // fallback options used when probing fails
   const defaultOptionsHtml = qualitySelect.innerHTML;
 
   let lastProbedUrl = null;
@@ -43,15 +43,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Swap the sliders icon for a spinner while a probe is in flight.
+  // swap the icon for a spinner while a probe is in flight
   function setProbing(probing) {
     qualityIcon.classList.toggle("hidden", probing);
     qualitySpinner.classList.toggle("hidden", !probing);
   }
 
-  // The probe doubles as a validity check: a resolved title means the link is a
-  // real, reachable video; a failure means we couldn't verify it.
-  // state: "valid" | "invalid" | "hidden". `text` is rendered safely.
+  // state is "valid", "invalid" or "hidden"; the probe doubles as a link validity check
   function setVideoInfo(state, text) {
     if (!videoInfo) return;
     if (state === "hidden") {
@@ -62,7 +60,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const icon = state === "valid" ? "fa-circle-check" : "fa-circle-exclamation";
     videoInfo.className = `video-info ${state}`;
     videoInfo.innerHTML = `<i class="fas ${icon}"></i><span class="title"></span>`;
-    videoInfo.querySelector(".title").textContent = text; // textContent = no HTML injection
+    videoInfo.querySelector(".title").textContent = text; // textContent avoids html injection
   }
 
   function populateOptions(heights) {
@@ -73,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     qualitySelect.innerHTML = html;
     qualitySelect.disabled = false;
-    // Keep the previous choice if it still exists, otherwise default to "best".
+    // keep the previous choice if it still exists
     if ([...qualitySelect.options].some((o) => o.value === preserved)) {
       qualitySelect.value = preserved;
     }
@@ -83,7 +81,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!url || url === lastProbedUrl) return;
     lastProbedUrl = url;
 
-    // Cancel any in-flight probe for an older URL.
+    // cancel any in-flight probe for an older url
     if (probeController) probeController.abort();
     const controller = new AbortController();
     probeController = controller;
@@ -103,20 +101,19 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!res.ok) throw new Error("probe failed");
       const data = await res.json();
 
-      // A resolved title confirms the link is a real, reachable video.
+      // a resolved title confirms the link is a real, reachable video
       setVideoInfo("valid", data.title || "Video found");
 
       if (data.heights && data.heights.length) {
         populateOptions(data.heights);
       } else {
-        // Extraction worked but exposed no heights — fall back gracefully.
+        // extraction worked but exposed no heights, fall back to the static list
         qualitySelect.innerHTML = defaultOptionsHtml;
         qualitySelect.disabled = false;
       }
     } catch (err) {
       if (err.name === "AbortError") return;
-      // Probe failed: restore the static list (the backend's height<= filter
-      // still degrades gracefully) and flag that we couldn't verify the link.
+      // probe failed: restore the static list and flag that we couldn't verify the link
       lastProbedUrl = null; // allow a retry on next change
       qualitySelect.innerHTML = defaultOptionsHtml;
       qualitySelect.disabled = false;
@@ -125,21 +122,18 @@ document.addEventListener("DOMContentLoaded", () => {
         "Couldn't verify this link. it may be private, removed, or not a supported video.",
       );
     } finally {
-      // Only clear the spinner if a newer probe hasn't already taken over.
+      // only clear the spinner if a newer probe hasn't taken over
       if (probeController === controller) setProbing(false);
     }
   }
 
-  // The selector is only meaningful once we have a link to probe, so keep it
-  // hidden until MP4 is chosen *and* a URL has been entered.
+  // keep the quality selector hidden until mp4 is chosen and a url is entered
   function updateQualityVisibility() {
     const url = urlInput.value.trim();
     const show = isMp4Selected() && url !== "";
     qualityGroup.classList.toggle("hidden", !show);
 
-    // Reveal straight into the spinner state for any URL we haven't probed yet,
-    // so the group never flashes the static slider icon + default list during
-    // the input debounce. Already-probed URLs keep their populated options.
+    // reveal straight into the spinner for an unprobed url so it doesn't flash the default list
     if (show && url !== lastProbedUrl) {
       setSelectState(true, "Loading available qualities…");
       setProbing(true);
@@ -161,8 +155,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Reveal + probe when the URL settles. `change` fires on blur/enter; the
-  // debounced `input` handler catches pastes without firing on every keystroke.
+  // change fires on blur/enter; the debounced input handler catches pastes
   urlInput.addEventListener("change", () => {
     updateQualityVisibility();
     maybeProbe();
@@ -195,7 +188,6 @@ async function startDownload() {
   const noticeContainer = document.getElementById("noticeContainer");
   const noticeMessage = document.getElementById("noticeMessage");
 
-  // Reset UI
   errorContainer.classList.add("hidden");
   noticeContainer.classList.add("hidden");
   statusContainer.classList.add("hidden");
@@ -206,14 +198,12 @@ async function startDownload() {
     return;
   }
 
-  // Set Loading State
   downloadBtn.disabled = true;
   btnText.textContent = "Processing...";
   btnIcon.style.display = "none";
   btnSpinner.style.display = "block";
 
   try {
-    // Start Download
     const response = await fetch("/api/download", {
       method: "POST",
       headers: {
@@ -225,7 +215,7 @@ async function startDownload() {
     const data = await response.json().catch(() => ({}));
 
     if (!response.ok) {
-      // FastAPI puts validation/refusal messages in `detail`.
+      // fastapi puts validation/refusal messages in detail
       showError(data.detail || `Request failed (status ${response.status})`);
       resetButton();
       return;
@@ -233,12 +223,11 @@ async function startDownload() {
 
     const taskId = data.task_id;
 
-    // Non-blocking heads-up (e.g. a single video pulled out of a playlist/mix).
+    // e.g. a single video pulled out of a playlist/mix
     if (data.notice) {
       showNotice(data.notice);
     }
 
-    // Start Polling
     statusContainer.classList.remove("hidden");
     pollProgress(taskId);
   } catch (error) {
@@ -274,7 +263,6 @@ async function startDownload() {
 
         const progressData = await res.json();
 
-        // Update UI
         if (progressData.status === "downloading") {
           progressBox.classList.remove("hidden");
           processingBox.classList.add("hidden");
@@ -284,14 +272,14 @@ async function startDownload() {
           percentage.textContent = Math.round(percent) + "%";
           statusMessage.textContent = `Downloading: ${progressData.filename || "..."}`;
         } else if (progressData.status === "processing") {
-          // Switch from Progress Bar to Spinner
+          // switch from progress bar to spinner
           progressBox.classList.add("hidden");
           processingBox.classList.remove("hidden");
         } else if (progressData.status === "finished") {
           processingBox.classList.add("hidden");
           clearInterval(interval);
-          
-          // Trigger file download using a temporary anchor tag
+
+          // trigger the file download via a temporary anchor
           const link = document.createElement('a');
           link.href = `/api/download_file/${taskId}`;
           link.download = ''; 
@@ -314,5 +302,5 @@ async function startDownload() {
   }
 }
 
-// Make global for onclick
+// expose for the onclick handler
 window.startDownload = startDownload;
