@@ -64,7 +64,9 @@ def cleanup_file(path: str, task_id: str = None):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    # no cookies/sessions to share cross-origin; credentials would also be a no-opgside the "*" wildcard, so disabling it avoids the misconfig if 
+    # alonauth is added later
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -89,8 +91,9 @@ ALLOWED_EXTRACTORS = ['default', '-generic']
 
 class DownloadRequest(BaseModel):
     url: str
-    format_type: str  # mp4 or mp3
-    quality: str = "best"  # best, 2160, 1440, 1080, 720, 480
+    format_type: Literal["mp4", "mp3"]
+    # constrained so quality can't be injected into yt-dlp's format selector
+    quality: Literal["best", "2160", "1440", "1080", "720", "480"] = "best"
 
 
 class FormatsRequest(BaseModel):
