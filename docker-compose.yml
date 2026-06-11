@@ -1,13 +1,18 @@
-version: '3.8'
-
 services:
   yt-dlp-web-gui:
     image: toastbrotlf2000/yt-dlp-web-gui:latest
 
-
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./downloads:/app/downloads
+    environment:
+      - HOST=${HOST:-0.0.0.0}
+      - PORT=${PORT:-8000}
+      - MAX_CONCURRENT_DOWNLOADS=${MAX_CONCURRENT_DOWNLOADS:-1}
+      - MAX_PENDING_DOWNLOADS=${MAX_PENDING_DOWNLOADS:-10}
+      - MAX_FILESIZE_MB=${MAX_FILESIZE_MB:-5120}
+      - FILE_TTL_MINUTES=${FILE_TTL_MINUTES:-60}
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-}
     restart: unless-stopped

@@ -7,15 +7,20 @@ RUN apk add --no-cache ffmpeg
 # Patch the build tooling that ships in the base image (pip/setuptools/wheel CVEs).
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel
 
+# Create non-root user and prepare downloads dir with correct ownership
+RUN adduser -D -u 1000 app && mkdir -p /app/downloads && chown app:app /app/downloads
+
 WORKDIR /app
 
 COPY requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY --chown=app:app . .
 
-RUN mkdir -p downloads && chmod 777 downloads
+ENV HOST=0.0.0.0
+
+USER app
 
 EXPOSE 8000
 
