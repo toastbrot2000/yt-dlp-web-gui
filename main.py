@@ -17,6 +17,8 @@ from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, field_validator
 import yt_dlp
+# raised from our hooks to abort a task; yt-dlp re-raises it unwrapped by contract
+from yt_dlp.utils import DownloadCancelled
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -143,10 +145,6 @@ cancel_events: Dict[str, threading.Event] = {}
 download_semaphore = threading.Semaphore(MAX_CONCURRENT_DOWNLOADS)
 
 
-class CancelledError(Exception):
-    pass
-
-
 ACTIVE_STATUSES = {"queued", "starting", "downloading", "processing", "cancelling"}
 TERMINAL_STATUSES = {"finished", "error", "cancelled"}
 
@@ -239,7 +237,7 @@ def progress_hook(d, task_id):
 
     cancel_event = cancel_events.get(task_id)
     if cancel_event and cancel_event.is_set():
-        raise CancelledError("Download cancelled by user")
+        raise DownloadCancelled("Download cancelled by user")
 
     if d['status'] == 'downloading':
         downloaded = d.get('downloaded_bytes', 0)
@@ -289,7 +287,7 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
     def postprocessor_hook(d):
         cancel_event = cancel_events.get(task_id)
         if cancel_event and cancel_event.is_set():
-            raise CancelledError("Download cancelled by user")
+            raise DownloadCancelled("Download cancelled by user")
         if d['status'] == 'finished':
             info = d.get('info_dict')
             task = download_progress.get(task_id)
@@ -423,7 +421,7 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
                         "timestamp": time.time()
                     })
 
-        except CancelledError:
+        except DownloadCancelled:
             logger.info(f"Task {task_id} cancelled by user.")
             shutil.rmtree(out_dir, ignore_errors=True)
             download_progress[task_id] = {
