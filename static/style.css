@@ -513,6 +513,17 @@ button#downloadBtn:focus-visible {
   box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--danger-line);
 }
 
+/* same ring as .input-spinner, shown in the cancel button while cancelling */
+.cancel-spinner {
+  flex: none;
+  width: 15px;
+  height: 15px;
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
 @keyframes shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }

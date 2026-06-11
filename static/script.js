@@ -264,7 +264,7 @@ document.addEventListener("DOMContentLoaded", () => {
       state === "cancelling" ? "Cancelling download" : "Cancel download",
     );
     cancelBtn.innerHTML = state === "cancelling"
-      ? '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>'
+      ? '<span class="cancel-spinner" aria-hidden="true"></span>'
       : '<i class="fas fa-xmark" aria-hidden="true"></i>';
   }
 
