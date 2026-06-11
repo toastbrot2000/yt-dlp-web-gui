@@ -254,7 +254,7 @@ select option {
   position: absolute;
   left: 16px;
   top: 50%;
-  transform: translateY(-50%);
+  translate: 0 -50%;
   width: 15px;
   height: 15px;
   border: 2px solid rgba(255, 255, 255, 0.18);
