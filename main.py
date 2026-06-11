@@ -3,11 +3,13 @@ import uuid
 import shutil
 import logging
 import asyncio
+import threading
 import time
 import urllib.parse
 from typing import Dict, Any, Literal
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +19,19 @@ import yt_dlp
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+load_dotenv()
+
+HOST = os.getenv("HOST", "127.0.0.1")
+PORT = int(os.getenv("PORT", "8000"))
+# how many downloads run at once; the rest wait in a queue
+MAX_CONCURRENT_DOWNLOADS = int(os.getenv("MAX_CONCURRENT_DOWNLOADS", "1"))
+# running + queued cap; beyond it new download requests get a 429
+MAX_PENDING_DOWNLOADS = int(os.getenv("MAX_PENDING_DOWNLOADS", "10"))
+MAX_FILESIZE_MB = int(os.getenv("MAX_FILESIZE_MB", "5120"))
+FILE_TTL_SECONDS = int(os.getenv("FILE_TTL_MINUTES", "60")) * 60
+# optional comma-separated host allowlist (DNS-rebinding protection)
+ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
 
 def is_task_id(name: str) -> bool:
     try:
@@ -35,7 +50,7 @@ async def cleanup_loop():
             # prune stale tasks; hooks refresh the timestamp while a download
             # makes progress, so active long downloads are never pruned
             for tid, data in list(download_progress.items()):
-                if data.get("timestamp") and now - data["timestamp"] > 3600:
+                if data.get("timestamp") and now - data["timestamp"] > FILE_TTL_SECONDS:
                     cleanup_task(tid)
                     logger.info(f"Cleanup: Pruned stale task {tid}")
 
@@ -46,7 +61,7 @@ async def cleanup_loop():
                 path = os.path.join(DOWNLOAD_DIR, name)
                 if not os.path.isdir(path) or not is_task_id(name) or name in download_progress:
                     continue
-                if now - os.path.getmtime(path) > 3600:
+                if now - os.path.getmtime(path) > FILE_TTL_SECONDS:
                     shutil.rmtree(path, ignore_errors=True)
                     logger.info(f"Cleanup: Deleted orphaned task dir {name}")
 
@@ -102,6 +117,10 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 download_progress: Dict[str, Dict[str, Any]] = {}
+
+# gates how many run_download bodies execute concurrently
+download_semaphore = threading.Semaphore(MAX_CONCURRENT_DOWNLOADS)
+ACTIVE_STATUSES = {"queued", "starting", "downloading", "processing"}
 
 # cache probed formats so repeated polls for a url don't re-hit the source site
 FORMAT_CACHE_TTL = 600
@@ -253,6 +272,9 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
         'noplaylist': True,
         # keep wall-clock mtimes (not upload dates) so the orphan sweep ages dirs correctly
         'updatetime': False,
+        # a stalled host shouldn't pin a worker thread forever
+        'socket_timeout': 30,
+        'max_filesize': MAX_FILESIZE_MB * 1024 * 1024,
         'allowed_extractors': ALLOWED_EXTRACTORS,
     }
 
@@ -294,59 +316,61 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
             ],
         })
 
-    try:
-        task = download_progress.get(task_id)
-        if task is None:
-            return  # pruned before the task got a turn
-        task.update({"status": "starting", "progress": 0, "timestamp": time.time()})
-
-        os.makedirs(out_dir, exist_ok=True)
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-
-            # deduce filepath if the hooks missed it
+    # wait for a download slot; the endpoint already published "queued"
+    with download_semaphore:
+        try:
             task = download_progress.get(task_id)
-            if task is not None and not task.get('filepath'):
-                if 'requested_downloads' in info:
-                    filepath = info['requested_downloads'][0].get('filepath')
+            if task is None:
+                return  # pruned while waiting in the queue
+            task.update({"status": "starting", "progress": 0, "timestamp": time.time()})
+
+            os.makedirs(out_dir, exist_ok=True)
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+
+                # deduce filepath if the hooks missed it
+                task = download_progress.get(task_id)
+                if task is not None and not task.get('filepath'):
+                    if 'requested_downloads' in info:
+                        filepath = info['requested_downloads'][0].get('filepath')
+                    else:
+                        filepath = ydl.prepare_filename(info)
+
+                    # account for the mp3 extension swap from post-processing
+                    if format_type == 'mp3' and filepath and not filepath.endswith('.mp3'):
+                        filepath = os.path.splitext(filepath)[0] + '.mp3'
+
+                    task['filepath'] = filepath
+                    task['filename'] = os.path.basename(filepath) if filepath else 'Unknown'
+
+            # mark finished only after the context manager exits, once post-processing is done
+            task = download_progress.get(task_id)
+            if task is not None:
+                filepath = task.get('filepath')
+                if filepath and os.path.exists(filepath):
+                    task.update({
+                        "status": "finished",
+                        "progress": 100,
+                        "timestamp": time.time()
+                    })
                 else:
-                    filepath = ydl.prepare_filename(info)
+                    # e.g. the size cap stopped the download without raising
+                    task.update({
+                        "status": "error",
+                        "error": "Download did not produce a file (it may exceed the server's size limit).",
+                        "timestamp": time.time()
+                    })
 
-                # account for the mp3 extension swap from post-processing
-                if format_type == 'mp3' and filepath and not filepath.endswith('.mp3'):
-                    filepath = os.path.splitext(filepath)[0] + '.mp3'
-
-                task['filepath'] = filepath
-                task['filename'] = os.path.basename(filepath) if filepath else 'Unknown'
-
-        # mark finished only after the context manager exits, once post-processing is done
-        task = download_progress.get(task_id)
-        if task is not None:
-            filepath = task.get('filepath')
-            if filepath and os.path.exists(filepath):
-                task.update({
-                    "status": "finished",
-                    "progress": 100,
-                    "timestamp": time.time()
-                })
-            else:
-                # e.g. the size cap stopped the download without raising
-                task.update({
-                    "status": "error",
-                    "error": "Download did not produce a file (it may exceed the server's size limit).",
-                    "timestamp": time.time()
-                })
-
-    except Exception as e:
-        logger.error(f"Error downloading {url}: {str(e)}")
-        # drop partial files now rather than waiting for the stale sweep
-        shutil.rmtree(out_dir, ignore_errors=True)
-        download_progress[task_id] = {
-            "status": "error",
-            "progress": 0,
-            "error": str(e),
-            "timestamp": time.time()
-        }
+        except Exception as e:
+            logger.error(f"Error downloading {url}: {str(e)}")
+            # drop partial files now rather than waiting for the stale sweep
+            shutil.rmtree(out_dir, ignore_errors=True)
+            download_progress[task_id] = {
+                "status": "error",
+                "progress": 0,
+                "error": str(e),
+                "timestamp": time.time()
+            }
 
 @app.post("/api/download")
 async def start_download(request: DownloadRequest, background_tasks: BackgroundTasks):
@@ -357,6 +381,13 @@ async def start_download(request: DownloadRequest, background_tasks: BackgroundT
         raise HTTPException(
             status_code=400,
             detail="Playlists and mixes aren't supported yet. Please paste a link to a single video.",
+        )
+
+    active = sum(1 for t in download_progress.values() if t.get("status") in ACTIVE_STATUSES)
+    if active >= MAX_PENDING_DOWNLOADS:
+        raise HTTPException(
+            status_code=429,
+            detail="The server is busy with other downloads. Please try again in a bit.",
         )
 
     task_id = str(uuid.uuid4())
@@ -447,4 +478,4 @@ async def download_file(task_id: str, background_tasks: BackgroundTasks):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host=HOST, port=PORT)
