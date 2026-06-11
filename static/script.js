@@ -34,12 +34,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorMessage = document.getElementById("errorMessage");
   const noticeContainer = document.getElementById("noticeContainer");
   const noticeMessage = document.getElementById("noticeMessage");
+  const cancelRow = document.getElementById("cancelRow");
+  const cancelBtn = document.getElementById("cancelBtn");
 
   const defaultOptionsHtml = qualitySelect.innerHTML;
 
   let lastProbedUrl = null;
   let probeController = null;
   let debounceTimer = null;
+  let currentTaskId = null;
+  let pollInterval = null;
 
   function isMp4Selected() {
     const checked = document.querySelector('input[name="format"]:checked');
@@ -185,8 +189,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function resetButton() {
+    currentTaskId = null;
+    if (pollInterval) {
+      clearInterval(pollInterval);
+      pollInterval = null;
+    }
     downloadBtn.disabled = false;
     btnText.textContent = "Download";
+    btnIcon.className = "fas fa-arrow-down-long";
     btnIcon.style.display = "inline-block";
     btnFill.classList.remove("indeterminate");
     btnFill.style.width = "0%";
@@ -215,15 +225,36 @@ document.addEventListener("DOMContentLoaded", () => {
     document.body.removeChild(link);
   }
 
+  async function cancelDownload(taskId) {
+    try {
+      const res = await fetch(`/api/cancel/${taskId}`, { method: "POST" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showError(data.detail || "Failed to cancel download");
+        return;
+      }
+    } catch (err) {
+      showError("Failed to cancel: " + err.message);
+    }
+  }
+
   function finishTask() {
     sessionStorage.removeItem(TASK_STORAGE_KEY);
     resetButton();
   }
 
+  function showCancelRow(cancelling) {
+    cancelRow.classList.remove("hidden");
+    cancelBtn.disabled = !!cancelling;
+    cancelBtn.innerHTML = cancelling
+      ? '<i class="fas fa-spinner fa-spin"></i> Cancelling…'
+      : '<i class="fas fa-xmark"></i> Cancel';
+  }
+
   function pollProgress(taskId) {
     let failures = 0;
 
-    const interval = setInterval(async () => {
+    pollInterval = setInterval(async () => {
       try {
         const res = await fetch(`/api/progress/${taskId}`);
         if (!res.ok) throw new Error(`Progress check failed (${res.status})`);
@@ -231,30 +262,43 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const progressData = await res.json();
 
-        if (progressData.status === "queued") {
-          showIndeterminate("Starting…");
-        } else if (progressData.status === "starting") {
-          showIndeterminate("Starting…");
+        if (progressData.status === "queued" || progressData.status === "starting") {
+          setBusy("Starting…");
+          showCancelRow(false);
         } else if (progressData.status === "downloading") {
-          const percent = progressData.progress || 0;
-          btnText.textContent = `Downloading ${Math.round(percent)}%`;
+          const percent = Math.round(progressData.progress || 0);
+          downloadBtn.disabled = true;
+          btnIcon.style.display = "none";
+          btnText.textContent = `Downloading ${percent}%`;
           btnFill.classList.remove("indeterminate");
           btnFill.style.width = percent + "%";
+          showCancelRow(false);
+        } else if (progressData.status === "cancelling") {
+          showCancelRow(true);
+        } else if (progressData.status === "cancelled") {
+          clearInterval(pollInterval);
+          pollInterval = null;
+          finishTask();
+          showNotice("Download was cancelled.");
         } else if (progressData.status === "processing") {
-          showIndeterminate("Converting…");
+          setBusy("Converting…");
+          showCancelRow(false);
         } else if (progressData.status === "finished") {
-          clearInterval(interval);
+          clearInterval(pollInterval);
+          pollInterval = null;
           triggerFileDownload(taskId);
           finishTask();
         } else if (progressData.status === "error") {
-          clearInterval(interval);
+          clearInterval(pollInterval);
+          pollInterval = null;
           finishTask();
           showError(progressData.error || "Unknown error occurred");
         }
       } catch (err) {
         failures += 1;
         if (failures >= MAX_POLL_FAILURES) {
-          clearInterval(interval);
+          clearInterval(pollInterval);
+          pollInterval = null;
           console.error(err);
           finishTask();
           showError("Lost connection to the server. The download may have been interrupted.");
@@ -296,12 +340,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       const taskId = data.task_id;
+      currentTaskId = taskId;
       sessionStorage.setItem(TASK_STORAGE_KEY, taskId);
 
       if (data.notice) {
         showNotice(data.notice);
       }
 
+      showCancelRow(false);
       pollProgress(taskId);
     } catch (error) {
       showError("Failed to start download: " + error.message);
@@ -310,6 +356,9 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   downloadBtn.addEventListener("click", startDownload);
+  cancelBtn.addEventListener("click", () => {
+    if (currentTaskId) cancelDownload(currentTaskId);
+  });
 
   (async () => {
     const storedId = sessionStorage.getItem(TASK_STORAGE_KEY);
@@ -326,11 +375,15 @@ document.addEventListener("DOMContentLoaded", () => {
       if (data.status === "finished") {
         triggerFileDownload(storedId);
         finishTask();
-      } else if (data.status === "error") {
+      } else if (data.status === "error" || data.status === "cancelled") {
         finishTask();
-        showError(data.error || "Unknown error occurred");
+        if (data.status === "error") {
+          showError(data.error || "Unknown error occurred");
+        }
       } else {
+        currentTaskId = storedId;
         setBusy("Reconnecting…");
+        showCancelRow(false);
         pollProgress(storedId);
       }
     } catch {}

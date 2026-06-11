@@ -459,6 +459,45 @@ button#downloadBtn:focus-visible {
   box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--accent-line);
 }
 
+/* cancel button */
+
+.cancel-row {
+  margin-top: 16px;
+}
+
+#cancelBtn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: var(--bg-soft);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--text-faint);
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--t), background var(--t), color var(--t);
+}
+
+#cancelBtn:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-hover);
+  color: var(--text-dim);
+}
+
+#cancelBtn:active {
+  transform: translateY(0);
+}
+
+#cancelBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 @keyframes shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }

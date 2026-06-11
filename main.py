@@ -102,6 +102,7 @@ def cleanup_task(task_id: str):
         logger.error(f"Error deleting task dir for {task_id}: {e}")
 
     download_progress.pop(task_id, None)
+    cancel_events.pop(task_id, None)
 
 
 # no CORS middleware on purpose: the frontend is served from this same origin,
@@ -136,10 +137,18 @@ os.makedirs(STATIC_DIR, exist_ok=True)
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 download_progress: Dict[str, Dict[str, Any]] = {}
+cancel_events: Dict[str, threading.Event] = {}
 
 # gates how many run_download bodies execute concurrently
 download_semaphore = threading.Semaphore(MAX_CONCURRENT_DOWNLOADS)
-ACTIVE_STATUSES = {"queued", "starting", "downloading", "processing"}
+
+
+class CancelledError(Exception):
+    pass
+
+
+ACTIVE_STATUSES = {"queued", "starting", "downloading", "processing", "cancelling"}
+TERMINAL_STATUSES = {"finished", "error", "cancelled"}
 
 # cache probed formats so repeated polls for a url don't re-hit the source site
 FORMAT_CACHE_TTL = 600
@@ -228,6 +237,10 @@ def progress_hook(d, task_id):
         # task entry disappeared; don't crash the hook (it would abort the download)
         return
 
+    cancel_event = cancel_events.get(task_id)
+    if cancel_event and cancel_event.is_set():
+        raise CancelledError("Download cancelled by user")
+
     if d['status'] == 'downloading':
         downloaded = d.get('downloaded_bytes', 0)
         total = d.get('total_bytes') or d.get('total_bytes_estimate')
@@ -274,6 +287,9 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
     logger.info(f"Starting download for {url} as {format_type} ({quality}) (Task ID: {task_id})")
 
     def postprocessor_hook(d):
+        cancel_event = cancel_events.get(task_id)
+        if cancel_event and cancel_event.is_set():
+            raise CancelledError("Download cancelled by user")
         if d['status'] == 'finished':
             info = d.get('info_dict')
             task = download_progress.get(task_id)
@@ -289,14 +305,13 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
     out_dir = task_dir(task_id)
 
     ydl_opts = {
-        # each task downloads into its own dir, so concurrent tasks can't
-        # collide on filenames and cleanup only ever touches dirs we created
+        # isolate each task in its own directory so concurrent tasks never collide
         'outtmpl': os.path.join(out_dir, '%(title)s.%(ext)s'),
         'progress_hooks': [lambda d: progress_hook(d, task_id)],
         'postprocessor_hooks': [postprocessor_hook],
         'quiet': True,
         'no_warnings': True,
-        # single video only, even if the url carries a playlist/mix
+        # single video even if the url has a playlist/mix
         'noplaylist': True,
         # keep wall-clock mtimes (not upload dates) so the orphan sweep ages dirs correctly
         'updatetime': False,
@@ -350,6 +365,15 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
             task = download_progress.get(task_id)
             if task is None:
                 return  # pruned while waiting in the queue
+            if task.get("status") == "cancelled":
+                return  # cancelled while waiting in the queue
+
+            cancel_event = cancel_events.get(task_id)
+            if cancel_event and cancel_event.is_set():
+                task.update({"status": "cancelled", "progress": 0, "timestamp": time.time()})
+                cancel_events.pop(task_id, None)
+                return
+
             task.update({"status": "starting", "progress": 0, "timestamp": time.time()})
 
             os.makedirs(out_dir, exist_ok=True)
@@ -371,7 +395,17 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
                     task['filepath'] = filepath
                     task['filename'] = os.path.basename(filepath) if filepath else 'Unknown'
 
-            # mark finished only after the context manager exits, once post-processing is done
+            cancel_event = cancel_events.get(task_id)
+            if cancel_event and cancel_event.is_set():
+                shutil.rmtree(out_dir, ignore_errors=True)
+                download_progress[task_id] = {
+                    "status": "cancelled",
+                    "progress": 0,
+                    "timestamp": time.time()
+                }
+                cancel_events.pop(task_id, None)
+                return
+
             task = download_progress.get(task_id)
             if task is not None:
                 filepath = task.get('filepath')
@@ -388,6 +422,16 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
                         "error": "Download did not produce a file (it may exceed the server's size limit).",
                         "timestamp": time.time()
                     })
+
+        except CancelledError:
+            logger.info(f"Task {task_id} cancelled by user.")
+            shutil.rmtree(out_dir, ignore_errors=True)
+            download_progress[task_id] = {
+                "status": "cancelled",
+                "progress": 0,
+                "timestamp": time.time()
+            }
+            cancel_events.pop(task_id, None)
 
         except Exception as e:
             logger.exception(f"Error downloading {url} (task {task_id})")
@@ -483,6 +527,30 @@ async def get_formats(request: FormatsRequest):
 
 # what the UI needs; internals like filepath stay server-side
 PROGRESS_FIELDS = ("status", "progress", "filename", "speed", "eta", "error")
+
+
+@app.post("/api/cancel/{task_id}")
+async def cancel_download(task_id: str):
+    task = download_progress.get(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    status = task.get("status")
+    if status in TERMINAL_STATUSES:
+        raise HTTPException(status_code=400, detail="Task has already finished or failed.")
+
+    cancel_event = cancel_events.get(task_id)
+    if cancel_event is None:
+        cancel_event = threading.Event()
+        cancel_events[task_id] = cancel_event
+    cancel_event.set()
+
+    if status == "queued":
+        task.update({"status": "cancelled", "progress": 0, "timestamp": time.time()})
+    else:
+        task.update({"status": "cancelling", "timestamp": time.time()})
+
+    return {"status": "ok"}
 
 
 @app.get("/api/progress/{task_id}")
