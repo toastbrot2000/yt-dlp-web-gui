@@ -7,3 +7,6 @@ __pycache__
 node_modules
 .env
 *.md
+dist
+build
+electron

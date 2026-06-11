@@ -22,6 +22,8 @@ COPY --chown=app:app . .
 
 ENV HOST=0.0.0.0
 
+LABEL org.opencontainers.image.source=https://github.com/toastbrot2000/very-simple-yt-downloader
+
 USER app
 
 EXPOSE 8000

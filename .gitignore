@@ -38,3 +38,10 @@ yarn-error.log
 
 # Local env
 .env
+
+# Electron build output
+electron/node_modules/
+electron/release/
+
+# PyInstaller spec (generated, but can be versioned if you prefer)
+*.spec

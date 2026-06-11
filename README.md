@@ -83,6 +83,7 @@ All settings are environment variables. Copy `.env.example` to `.env` and adjust
 | `MAX_FILESIZE_MB` | `5120` | Max file size in MB (passed to yt-dlp `max_filesize`) |
 | `FILE_TTL_MINUTES` | `60` | Stale task/file cleanup age in minutes |
 | `ALLOWED_HOSTS` | (unset) | Comma-separated host allowlist; enables `TrustedHostMiddleware` for DNS-rebinding protection |
+| `CSP_SCRIPT_SRC` | `'self'` | Content-Security-Policy `script-src` directive. Override to `'self' 'unsafe-inline'` if deploying behind a reverse proxy or CDN that injects inline scripts (like Cloudflare's Bot Fight Mode or analytics) |
 
 ## How it Works
 

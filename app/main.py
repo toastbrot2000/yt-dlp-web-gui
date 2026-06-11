@@ -8,7 +8,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.config import ALLOWED_HOSTS, STATIC_DIR
+from app.config import ALLOWED_HOSTS, CSP_SCRIPT_SRC, STATIC_DIR
 from app.downloads import cleanup_loop
 from app.routes import router
 
@@ -40,7 +40,7 @@ async def security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "no-referrer"
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self'; "
+        f"script-src {CSP_SCRIPT_SRC}; "
         "style-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
         "font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
         "img-src 'self' data:; "
