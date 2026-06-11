@@ -21,15 +21,8 @@ A lightweight, stateless-ish web interface for `yt-dlp`. Download videos as MP4 
 
 ```bash
 docker run -d \
-  --name yt-dlp-web-gui \
   -p 127.0.0.1:8000:8000 \
   -v ./downloads:/app/downloads \
-  -e HOST=0.0.0.0 \
-  -e MAX_CONCURRENT_DOWNLOADS=1 \
-  -e MAX_PENDING_DOWNLOADS=10 \
-  -e MAX_FILESIZE_MB=5120 \
-  -e FILE_TTL_MINUTES=60 \
-  --restart unless-stopped \
   toastbrotlf2000/yt-dlp-web-gui:latest
 ```
 
@@ -54,8 +47,6 @@ services:
 
 Then run `docker compose up -d` and open `http://localhost:8000`.
 
-> **Note:** The default port binding is `127.0.0.1:8000:8000` (localhost only). To expose to your LAN, change it to `8000:8000`. **Warning:** there is no authentication — only do this on trusted networks.
-
 
 ## Build from Source
 
@@ -79,8 +70,6 @@ pip install -r requirements.txt
 python main.py
 ```
 
-By default the server binds to `127.0.0.1:8000`. Override with `HOST` and `PORT` env vars, or use a `.env` file (see `.env.example`).
-
 ## Configuration
 
 All settings are environment variables. Copy `.env.example` to `.env` and adjust:
@@ -103,11 +92,11 @@ All settings are environment variables. Copy `.env.example` to `.env` and adjust
 4. **Download:** `yt-dlp` downloads into a per-task directory (`downloads/<uuid>/`), so concurrent tasks never collide.
 5. **Processing:** `ffmpeg` converts/merges as needed. Metadata and thumbnail are embedded.
 6. **Delivery:** The frontend triggers a native browser download.
-7. **Cleanup:** The task directory is deleted right after the download starts. A background loop also prunes stale tasks and orphaned UUID-named dirs — anything else in the mount is left alone.
+7. **Cleanup:** The task directory is deleted right after the download starts. A background loop also prunes stale tasks and orphaned UUID-named dirs. Anything else in the mount is left alone.
 
 ## Nightly Builds
 
-A GitHub Actions workflow checks daily for new yt-dlp releases. When a new version is found, it updates `requirements.txt`, commits the change, and publishes a Docker image to both GHCR and Docker Hub. Manual trigger also available via the Actions tab.
+A GitHub Actions workflow checks daily for new yt-dlp releases. When a new version is found, it automatically publishes a nightly image to both GHCR and Docker Hub. You can automatically check for updates using Watchtower / Keel or similar.
 
 ## Exposing to your LAN
 
@@ -120,9 +109,9 @@ Change the port binding from `"127.0.0.1:8000:8000"` to `"8000:8000"`. The conta
 Future goals for this project include:
 
 - [ ] **Playlist Support:** Ability to download entire YouTube playlists.
+- [ ] **Desktop executables** executable images for windows and perhaps linux distros. No self-hosting needed.
 - [ ] **Advanced Format Selection:** UI to choose specific video/audio codecs.
 - [ ] **Authentication:** Optional basic auth for private deployments.
-- [ ] **Mobile App PWA:** Make the web interface a fully installable Progressive Web App.
 - [ ] **Download History:** Optional local-storage based history (keeping the server stateless).
 
 ## Acknowledgements
@@ -135,4 +124,4 @@ Future goals for this project include:
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE).
