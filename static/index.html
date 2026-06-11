@@ -87,14 +87,15 @@
           <p id="videoInfo" class="video-info hidden" role="status"></p>
         </div>
 
-        <button id="downloadBtn">
-          <span id="btnFill"></span>
-          <span id="btnText">Download</span>
-          <i class="fas fa-arrow-down-long" id="btnIcon" aria-hidden="true"></i>
-        </button>
-
-        <div id="cancelRow" class="cancel-row hidden">
-          <button id="cancelBtn"><i class="fas fa-xmark"></i> Cancel</button>
+        <div class="btn-row" id="btnRow">
+          <button id="downloadBtn">
+            <span id="btnFill"></span>
+            <span id="btnText">Download</span>
+            <i class="fas fa-arrow-down-long" id="btnIcon" aria-hidden="true"></i>
+          </button>
+          <button id="cancelBtn" aria-label="Cancel download">
+            <i class="fas fa-xmark" aria-hidden="true"></i>
+          </button>
         </div>
 
         <div id="noticeContainer" class="notice-container hidden" role="status">
