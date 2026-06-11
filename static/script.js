@@ -211,11 +211,6 @@ document.addEventListener("DOMContentLoaded", () => {
     return fallback;
   }
 
-  function showIndeterminate(buttonText) {
-    btnText.textContent = buttonText;
-    btnFill.classList.add("indeterminate");
-  }
-
   function triggerFileDownload(taskId) {
     const link = document.createElement("a");
     link.href = `/api/download_file/${taskId}`;
@@ -386,6 +381,8 @@ document.addEventListener("DOMContentLoaded", () => {
         showCancelRow(false);
         pollProgress(storedId);
       }
-    } catch {}
+    } catch {
+      // server unreachable right now; keep the stored id for the next load
+    }
   })();
 });
