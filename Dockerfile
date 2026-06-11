@@ -1,4 +1,6 @@
-FROM python:3-alpine3.24
+# pin the python minor too: nightly rebuilds must not silently jump
+# to a new python release and break wheel availability on alpine
+FROM python:3.14-alpine3.24
 
 # Alpine's ffmpeg is musl-native, apk-maintained, and small (no Debian GUI tree).
 # Provides both ffmpeg and ffprobe, used by yt-dlp's FFmpeg postprocessors.
