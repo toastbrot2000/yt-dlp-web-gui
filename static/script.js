@@ -200,6 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnIcon.style.display = "inline-block";
     btnFill.classList.remove("indeterminate");
     btnFill.style.width = "0%";
+    hideCancelRow();
   }
 
   function detailToMessage(detail, fallback) {
@@ -238,12 +239,22 @@ document.addEventListener("DOMContentLoaded", () => {
     resetButton();
   }
 
+  let cancelRowState = null; // "active" | "cancelling" | null (hidden)
+
   function showCancelRow(cancelling) {
+    const state = cancelling ? "cancelling" : "active";
+    if (cancelRowState === state) return; // avoid DOM churn on every poll tick
+    cancelRowState = state;
     cancelRow.classList.remove("hidden");
     cancelBtn.disabled = !!cancelling;
     cancelBtn.innerHTML = cancelling
       ? '<i class="fas fa-spinner fa-spin"></i> Cancelling…'
       : '<i class="fas fa-xmark"></i> Cancel';
+  }
+
+  function hideCancelRow() {
+    cancelRowState = null;
+    cancelRow.classList.add("hidden");
   }
 
   function pollProgress(taskId) {
@@ -352,7 +363,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   downloadBtn.addEventListener("click", startDownload);
   cancelBtn.addEventListener("click", () => {
-    if (currentTaskId) cancelDownload(currentTaskId);
+    if (!currentTaskId) return;
+    // optimistic; the next poll corrects it if the request failed
+    showCancelRow(true);
+    cancelDownload(currentTaskId);
   });
 
   (async () => {
