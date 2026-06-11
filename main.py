@@ -1,4 +1,5 @@
 import os
+import re
 import uuid
 import shutil
 import logging
@@ -10,9 +11,9 @@ from typing import Dict, Any, Literal
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, field_validator
 import yt_dlp
@@ -98,15 +99,28 @@ def cleanup_task(task_id: str):
 
     download_progress.pop(task_id, None)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    # no cookies/sessions to share cross-origin; credentials would also be a no-opgside the "*" wildcard, so disabling it avoids the misconfig if 
-    # alonauth is added later
-    allow_credentials=False,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# no CORS middleware on purpose: the frontend is served from this same origin,
+# so cross-origin pages get no permission to drive the (unauthenticated) API
+
+# optional Host-header allowlist (DNS-rebinding protection)
+if ALLOWED_HOSTS:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=ALLOWED_HOSTS)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+        "font-src https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+        "img-src 'self' data:; "
+        "connect-src 'self'"
+    )
+    return response
 
 DOWNLOAD_DIR = os.path.join(os.getcwd(), "downloads")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
@@ -362,13 +376,20 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
                     })
 
         except Exception as e:
-            logger.error(f"Error downloading {url}: {str(e)}")
+            logger.exception(f"Error downloading {url} (task {task_id})")
             # drop partial files now rather than waiting for the stale sweep
             shutil.rmtree(out_dir, ignore_errors=True)
+            if isinstance(e, yt_dlp.utils.DownloadError):
+                # extractor messages ("Video unavailable", ...) are safe and useful
+                message = re.sub(r'\x1b\[[0-9;]*m', '', str(e))
+                message = re.sub(r'^ERROR:\s*', '', message)
+            else:
+                # anything else may leak paths or internals
+                message = "Download failed due to an internal server error."
             download_progress[task_id] = {
                 "status": "error",
                 "progress": 0,
-                "error": str(e),
+                "error": message,
                 "timestamp": time.time()
             }
 
@@ -433,11 +454,16 @@ async def get_formats(request: FormatsRequest):
     return {"title": title, "heights": heights}
 
 
+# what the UI needs; internals like filepath stay server-side
+PROGRESS_FIELDS = ("status", "progress", "filename", "speed", "eta", "error")
+
+
 @app.get("/api/progress/{task_id}")
 async def get_progress(task_id: str):
-    if task_id not in download_progress:
+    task = download_progress.get(task_id)
+    if task is None:
         raise HTTPException(status_code=404, detail="Task not found")
-    return download_progress[task_id]
+    return {k: task[k] for k in PROGRESS_FIELDS if k in task}
 
 @app.get("/")
 async def read_index():
