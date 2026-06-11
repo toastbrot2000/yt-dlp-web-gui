@@ -9,6 +9,8 @@ A lightweight, stateless-ish web interface for `yt-dlp`. Download videos as MP4 
 - **Rich UI:** Modern, responsive interface with real-time progress tracking.
 - **Docker Ready:** Run instantly with a single command via Docker Hub.
 - **FFmpeg Integration:** Seamlessly handles audio conversion and video merging.
+- **Per-task isolation:** Each download gets its own directory; concurrent downloads never collide and cleanup only touches dirs we created.
+- **Concurrency & size limits:** Configurable max concurrent downloads, queue depth, and file size cap.
 
 <img width="889" height="857" alt="image" src="https://github.com/user-attachments/assets/aa8255ec-c465-4b75-94ab-bf6899238187" />
 
@@ -23,9 +25,16 @@ services:
   yt-dlp-web-gui:
     image: toastbrotlf2000/yt-dlp-web-gui:latest
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     volumes:
       - ./downloads:/app/downloads
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8000
+      - MAX_CONCURRENT_DOWNLOADS=1
+      - MAX_PENDING_DOWNLOADS=10
+      - MAX_FILESIZE_MB=5120
+      - FILE_TTL_MINUTES=60
     restart: unless-stopped
 ```
 
@@ -35,6 +44,8 @@ docker compose up -d
 ```
 
 Access the UI at `http://localhost:8000`.
+
+> **Note:** The default port binding is `127.0.0.1:8000:8000` (localhost only). To expose to your LAN, change it to `8000:8000`. **Warning:** there is no authentication — only do this on trusted networks.
 
 ## Non-Technical Start (Docker Desktop)
 
@@ -74,13 +85,38 @@ Ensure you have `ffmpeg` installed on your system.
    python main.py
    ```
 
+   By default the server binds to `127.0.0.1:8000`. Override with `HOST` and `PORT` env vars if needed.
+
+## Configuration
+
+All settings are environment variables. Copy `.env.example` to `.env` and adjust:
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `HOST` | `127.0.0.1` | Bind address (container must use `0.0.0.0`; host exposure controlled by compose port mapping) |
+| `PORT` | `8000` | Listen port |
+| `MAX_CONCURRENT_DOWNLOADS` | `1` | Downloads running at once; others wait as `queued` |
+| `MAX_PENDING_DOWNLOADS` | `10` | Active + queued cap; beyond it `POST /api/download` returns 429 |
+| `MAX_FILESIZE_MB` | `5120` | Max file size in MB (passed to yt-dlp `max_filesize`) |
+| `FILE_TTL_MINUTES` | `60` | Stale task/file cleanup age in minutes |
+| `ALLOWED_HOSTS` | (unset) | Comma-separated host allowlist; when set, enables `TrustedHostMiddleware` for DNS-rebinding protection |
+
+See `.env.example` for a ready-to-copy template with comments.
+
 ## How it Works
 
 1. **Request:** The user submits a video URL and selects a format (MP3/MP4).
-2. **Download:** The server uses `yt-dlp` to download the content.
-3. **Processing:** If conversion or merging is needed, `ffmpeg` is invoked automatically.
-4. **Delivery:** Once ready, the frontend triggers a native browser download.
-5. **Cleanup:** The file is deleted from the server immediately after the download is initiated.
+2. **Queue:** If the concurrency limit is reached, the task waits in `queued` status.
+3. **Download:** The server uses `yt-dlp` to download into a per-task directory (`downloads/<task_id>/`).
+4. **Processing:** If conversion or merging is needed, `ffmpeg` is invoked automatically.
+5. **Delivery:** Once ready, the frontend triggers a native browser download.
+6. **Cleanup:** The task directory is deleted immediately after the download is initiated. A background loop also prunes stale tasks and orphaned dirs (only UUID-named dirs — user files on the host mount are never touched).
+
+## Exposing to your LAN
+
+Change the compose port binding from `"127.0.0.1:8000:8000"` to `"8000:8000"`. The container will then accept connections on all interfaces.
+
+**Warning:** The API has no authentication. Only expose on trusted networks, or set `ALLOWED_HOSTS` in `.env` (e.g. `ALLOWED_HOSTS=localhost,127.0.0.1,192.168.1.50`) to restrict the Host header.
 
 ## Roadmap
 
@@ -100,7 +136,7 @@ This project is a wrapper around several incredible open-source tools:
 - **[FastAPI](https://fastapi.tiangolo.com/):** Licensed under MIT. The high-performance backend.
 - **[FFmpeg](https://ffmpeg.org/):** Licensed under LGPL/GPL. Used for media conversion and merging.
 - **[Font Awesome](https://fontawesome.com/):** Icons used under the CC BY 4.0 license.
-- **[Outfit Font](https://fonts.google.com/specimen/Outfit):** Used under the Open Font License.
+- **[Hanken Grotesk Font](https://fonts.google.com/specimen/Hanken-Grotesk):** Used under the Open Font License.
 
 ## License
 
