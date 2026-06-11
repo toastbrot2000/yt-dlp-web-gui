@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const noticeMessage = document.getElementById("noticeMessage");
   const btnRow = document.getElementById("btnRow");
   const cancelBtn = document.getElementById("cancelBtn");
+  const srStatus = document.getElementById("srStatus");
 
   const defaultOptionsHtml = qualitySelect.innerHTML;
 
@@ -201,6 +202,17 @@ document.addEventListener("DOMContentLoaded", () => {
     btnFill.classList.remove("indeterminate");
     btnFill.style.width = "0%";
     setCancelButton(null);
+    lastAnnounced = null;
+  }
+
+  let lastAnnounced = null;
+
+  // visually-hidden live region for screen readers: announce phase changes,
+  // not every percent. errors/notices announce themselves via role=alert/status.
+  function announce(phase, text) {
+    if (lastAnnounced === phase) return;
+    lastAnnounced = phase;
+    srStatus.textContent = text;
   }
 
   function detailToMessage(detail, fallback) {
@@ -270,7 +282,9 @@ document.addEventListener("DOMContentLoaded", () => {
         if (progressData.status === "queued" || progressData.status === "starting") {
           setBusy("Starting…");
           setCancelButton("active");
+          announce("starting", "Download started");
         } else if (progressData.status === "downloading") {
+          announce("downloading", "Downloading video");
           const percent = Math.round(progressData.progress || 0);
           downloadBtn.disabled = true;
           btnIcon.style.display = "none";
@@ -280,6 +294,7 @@ document.addEventListener("DOMContentLoaded", () => {
           setCancelButton("active");
         } else if (progressData.status === "cancelling") {
           setCancelButton("cancelling");
+          announce("cancelling", "Cancelling download");
         } else if (progressData.status === "cancelled") {
           clearInterval(pollInterval);
           pollInterval = null;
@@ -288,9 +303,11 @@ document.addEventListener("DOMContentLoaded", () => {
         } else if (progressData.status === "processing") {
           setBusy("Converting…");
           setCancelButton("active");
+          announce("processing", "Converting file");
         } else if (progressData.status === "finished") {
           clearInterval(pollInterval);
           pollInterval = null;
+          announce("finished", "Download finished, saving file");
           triggerFileDownload(taskId);
           finishTask();
         } else if (progressData.status === "error") {
