@@ -179,7 +179,7 @@ def inspect_url(url: str):
     path = parsed.path or ""
 
     has_video = bool(qs.get("v"))
-    if "youtu.be" in host and path.strip("/"):
+    if host in ("youtu.be", "www.youtu.be") and path.strip("/"):
         has_video = True  # youtu.be/<id>
     if path.startswith("/shorts/") or path.startswith("/embed/"):
         has_video = True
@@ -194,6 +194,8 @@ def probe_heights(url: str):
         'quiet': True,
         'no_warnings': True,
         'noplaylist': True,
+        # noplaylist doesn't apply to pure playlist urls; never probe more than one entry
+        'playlist_items': '1',
         'skip_download': True,
         # bound the probe so a slow host can't tie up a worker
         'socket_timeout': 8,
@@ -395,7 +397,11 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
 
 @app.post("/api/download")
 async def start_download(request: DownloadRequest, background_tasks: BackgroundTasks):
-    has_video, is_playlist = inspect_url(request.url)
+    url = (request.url or "").strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="No URL provided.")
+
+    has_video, is_playlist = inspect_url(url)
 
     # a pure playlist/mix with no single video to fall back to isn't supported yet
     if is_playlist and not has_video:
@@ -415,7 +421,7 @@ async def start_download(request: DownloadRequest, background_tasks: BackgroundT
     # publish the task before scheduling so the first progress poll can't 404;
     # run_download flips it to "starting" once it gets a turn
     download_progress[task_id] = {"status": "queued", "progress": 0, "timestamp": time.time()}
-    background_tasks.add_task(run_download, task_id, request.url, request.format_type, request.quality)
+    background_tasks.add_task(run_download, task_id, url, request.format_type, request.quality)
 
     response = {"task_id": task_id}
     if is_playlist and has_video:
@@ -430,6 +436,13 @@ async def get_formats(request: FormatsRequest):
     url = (request.url or "").strip()
     if not url:
         raise HTTPException(status_code=400, detail="No URL provided.")
+
+    has_video, is_playlist = inspect_url(url)
+    if is_playlist and not has_video:
+        raise HTTPException(
+            status_code=400,
+            detail="Playlists and mixes aren't supported yet. Please paste a link to a single video.",
+        )
 
     # serve from cache when fresh to avoid re-probing the source
     cached = format_cache.get(url)
@@ -467,7 +480,6 @@ async def get_progress(task_id: str):
 
 @app.get("/")
 async def read_index():
-    from fastapi.responses import FileResponse
     return FileResponse('static/index.html')
 
 @app.get("/api/download_file/{task_id}")
