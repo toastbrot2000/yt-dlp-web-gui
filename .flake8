@@ -1,4 +1,4 @@
 [flake8]
 max-line-length = 120
-exclude = .git,__pycache__,docs/source/conf.py,old,build,dist,venv,node_modules
+exclude = .git,__pycache__,docs/source/conf.py,old,build,dist,venv,.venv,node_modules
 ignore = E203, W503

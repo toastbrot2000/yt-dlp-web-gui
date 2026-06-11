@@ -34,6 +34,7 @@ FILE_TTL_SECONDS = int(os.getenv("FILE_TTL_MINUTES", "60")) * 60
 # optional comma-separated host allowlist (DNS-rebinding protection)
 ALLOWED_HOSTS = [h.strip() for h in os.getenv("ALLOWED_HOSTS", "").split(",") if h.strip()]
 
+
 def is_task_id(name: str) -> bool:
     try:
         uuid.UUID(name)
@@ -76,6 +77,7 @@ async def cleanup_loop():
 
         await asyncio.sleep(600)
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # keep a reference so the task can't be garbage-collected mid-flight
@@ -85,8 +87,10 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="yt-dlp Web GUI", lifespan=lifespan)
 
+
 def task_dir(task_id: str) -> str:
     return os.path.join(DOWNLOAD_DIR, task_id)
+
 
 def cleanup_task(task_id: str):
     try:
@@ -98,6 +102,7 @@ def cleanup_task(task_id: str):
         logger.error(f"Error deleting task dir for {task_id}: {e}")
 
     download_progress.pop(task_id, None)
+
 
 # no CORS middleware on purpose: the frontend is served from this same origin,
 # so cross-origin pages get no permission to drive the (unauthenticated) API
@@ -260,7 +265,7 @@ def progress_hook(d, task_id):
 
 def run_download(task_id: str, url: str, format_type: str, quality: str = "best"):
     logger.info(f"Starting download for {url} as {format_type} ({quality}) (Task ID: {task_id})")
-    
+
     def postprocessor_hook(d):
         if d['status'] == 'finished':
             info = d.get('info_dict')
@@ -395,6 +400,7 @@ def run_download(task_id: str, url: str, format_type: str, quality: str = "best"
                 "timestamp": time.time()
             }
 
+
 @app.post("/api/download")
 async def start_download(request: DownloadRequest, background_tasks: BackgroundTasks):
     url = (request.url or "").strip()
@@ -430,6 +436,7 @@ async def start_download(request: DownloadRequest, background_tasks: BackgroundT
             "downloaded for now. Full playlist support is coming later."
         )
     return response
+
 
 @app.post("/api/formats")
 async def get_formats(request: FormatsRequest):
@@ -478,20 +485,22 @@ async def get_progress(task_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
     return {k: task[k] for k in PROGRESS_FIELDS if k in task}
 
+
 @app.get("/")
 async def read_index():
     return FileResponse('static/index.html')
 
+
 @app.get("/api/download_file/{task_id}")
 async def download_file(task_id: str, background_tasks: BackgroundTasks):
-    
+
     if task_id not in download_progress:
         raise HTTPException(status_code=404, detail="Task not found")
-    
+
     task = download_progress[task_id]
     if task.get("status") != "finished" or not task.get("filepath"):
         raise HTTPException(status_code=400, detail="File not ready or failed")
-    
+
     file_path = task["filepath"]
     if not os.path.exists(file_path):
         # already cleaned up or lost to a restart; drop the dangling task
@@ -507,8 +516,8 @@ async def download_file(task_id: str, background_tasks: BackgroundTasks):
     background_tasks.add_task(cleanup_task, task_id)
 
     return FileResponse(
-        file_path, 
-        media_type='application/octet-stream', 
+        file_path,
+        media_type='application/octet-stream',
         headers={
             "Content-Disposition": f"attachment; filename=\"{encoded_filename}\"; filename*=UTF-8''{encoded_filename}"
         }
