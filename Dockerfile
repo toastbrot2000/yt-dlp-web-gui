@@ -1,4 +1,4 @@
-FROM python:3.14-alpine
+FROM python:3-alpine3.24
 
 # Alpine's ffmpeg is musl-native, apk-maintained, and small (no Debian GUI tree).
 # Provides both ffmpeg and ffprobe, used by yt-dlp's FFmpeg postprocessors.
