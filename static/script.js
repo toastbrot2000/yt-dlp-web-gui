@@ -34,7 +34,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const errorMessage = document.getElementById("errorMessage");
   const noticeContainer = document.getElementById("noticeContainer");
   const noticeMessage = document.getElementById("noticeMessage");
-  const cancelRow = document.getElementById("cancelRow");
+  const btnRow = document.getElementById("btnRow");
   const cancelBtn = document.getElementById("cancelBtn");
 
   const defaultOptionsHtml = qualitySelect.innerHTML;
@@ -200,7 +200,7 @@ document.addEventListener("DOMContentLoaded", () => {
     btnIcon.style.display = "inline-block";
     btnFill.classList.remove("indeterminate");
     btnFill.style.width = "0%";
-    hideCancelRow();
+    setCancelButton(null);
   }
 
   function detailToMessage(detail, fallback) {
@@ -239,22 +239,21 @@ document.addEventListener("DOMContentLoaded", () => {
     resetButton();
   }
 
-  let cancelRowState = null; // "active" | "cancelling" | null (hidden)
+  let cancelState = null; // "active" | "cancelling" | null (hidden)
 
-  function showCancelRow(cancelling) {
-    const state = cancelling ? "cancelling" : "active";
-    if (cancelRowState === state) return; // avoid DOM churn on every poll tick
-    cancelRowState = state;
-    cancelRow.classList.remove("hidden");
-    cancelBtn.disabled = !!cancelling;
-    cancelBtn.innerHTML = cancelling
-      ? '<i class="fas fa-spinner fa-spin"></i> Cancelling…'
-      : '<i class="fas fa-xmark"></i> Cancel';
-  }
-
-  function hideCancelRow() {
-    cancelRowState = null;
-    cancelRow.classList.add("hidden");
+  // the square ✕ docked next to the main button while a task is active
+  function setCancelButton(state) {
+    if (cancelState === state) return; // avoid DOM churn on every poll tick
+    cancelState = state;
+    btnRow.classList.toggle("task-active", state !== null);
+    cancelBtn.disabled = state === "cancelling";
+    cancelBtn.setAttribute(
+      "aria-label",
+      state === "cancelling" ? "Cancelling download" : "Cancel download",
+    );
+    cancelBtn.innerHTML = state === "cancelling"
+      ? '<i class="fas fa-spinner fa-spin" aria-hidden="true"></i>'
+      : '<i class="fas fa-xmark" aria-hidden="true"></i>';
   }
 
   function pollProgress(taskId) {
@@ -270,7 +269,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         if (progressData.status === "queued" || progressData.status === "starting") {
           setBusy("Starting…");
-          showCancelRow(false);
+          setCancelButton("active");
         } else if (progressData.status === "downloading") {
           const percent = Math.round(progressData.progress || 0);
           downloadBtn.disabled = true;
@@ -278,9 +277,9 @@ document.addEventListener("DOMContentLoaded", () => {
           btnText.textContent = `Downloading ${percent}%`;
           btnFill.classList.remove("indeterminate");
           btnFill.style.width = percent + "%";
-          showCancelRow(false);
+          setCancelButton("active");
         } else if (progressData.status === "cancelling") {
-          showCancelRow(true);
+          setCancelButton("cancelling");
         } else if (progressData.status === "cancelled") {
           clearInterval(pollInterval);
           pollInterval = null;
@@ -288,7 +287,7 @@ document.addEventListener("DOMContentLoaded", () => {
           showNotice("Download was cancelled.");
         } else if (progressData.status === "processing") {
           setBusy("Converting…");
-          showCancelRow(false);
+          setCancelButton("active");
         } else if (progressData.status === "finished") {
           clearInterval(pollInterval);
           pollInterval = null;
@@ -353,7 +352,7 @@ document.addEventListener("DOMContentLoaded", () => {
         showNotice(data.notice);
       }
 
-      showCancelRow(false);
+      setCancelButton("active");
       pollProgress(taskId);
     } catch (error) {
       showError("Failed to start download: " + error.message);
@@ -365,7 +364,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cancelBtn.addEventListener("click", () => {
     if (!currentTaskId) return;
     // optimistic; the next poll corrects it if the request failed
-    showCancelRow(true);
+    setCancelButton("cancelling");
     cancelDownload(currentTaskId);
   });
 
@@ -392,7 +391,7 @@ document.addEventListener("DOMContentLoaded", () => {
       } else {
         currentTaskId = storedId;
         setBusy("Reconnecting…");
-        showCancelRow(false);
+        setCancelButton("active");
         pollProgress(storedId);
       }
     } catch {
