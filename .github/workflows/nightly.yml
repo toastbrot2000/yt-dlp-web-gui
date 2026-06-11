@@ -6,7 +6,8 @@ on:
   workflow_dispatch:  # manual trigger
 
 permissions:
-  contents: read
+  # write needed: the workflow commits the yt-dlp version bump back to main
+  contents: write
   packages: write
 
 jobs:
