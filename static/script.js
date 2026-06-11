@@ -239,10 +239,13 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         showError(data.detail || "Failed to cancel download");
+        // drop the optimistic state so polling repaints the real phase
+        setCancelButton("active");
         return;
       }
     } catch (err) {
       showError("Failed to cancel: " + err.message);
+      setCancelButton("active");
     }
   }
 
@@ -279,7 +282,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const progressData = await res.json();
 
-        if (progressData.status === "queued" || progressData.status === "starting") {
+        const activePhases = ["queued", "starting", "downloading", "processing"];
+        if (cancelState === "cancelling" && activePhases.includes(progressData.status)) {
+          // cancel already requested; ignore stale phase reports so the
+          // button keeps showing "Cancelling…" until the server confirms
+        } else if (progressData.status === "queued" || progressData.status === "starting") {
           setBusy("Starting…");
           setCancelButton("active");
           announce("starting", "Download started");
@@ -293,6 +300,7 @@ document.addEventListener("DOMContentLoaded", () => {
           btnFill.style.width = percent + "%";
           setCancelButton("active");
         } else if (progressData.status === "cancelling") {
+          setBusy("Cancelling…");
           setCancelButton("cancelling");
           announce("cancelling", "Cancelling download");
         } else if (progressData.status === "cancelled") {
@@ -380,8 +388,10 @@ document.addEventListener("DOMContentLoaded", () => {
   downloadBtn.addEventListener("click", startDownload);
   cancelBtn.addEventListener("click", () => {
     if (!currentTaskId) return;
-    // optimistic; the next poll corrects it if the request failed
+    // optimistic; cancelDownload reverts it if the request fails
+    setBusy("Cancelling…");
     setCancelButton("cancelling");
+    announce("cancelling", "Cancelling download");
     cancelDownload(currentTaskId);
   });
 
