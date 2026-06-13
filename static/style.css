@@ -3,7 +3,7 @@
 :root {
   /* surfaces */
   --bg: #0a0a0c;
-  --bg-soft: #0e0e11;
+  --bg-soft: #25252b;
   --surface: rgba(255, 255, 255, 0.025);
   --surface-hover: rgba(255, 255, 255, 0.05);
 
@@ -13,8 +13,8 @@
 
   /* text */
   --text: #f4f3f1;
-  --text-dim: #9a9aa2;
-  --text-faint: #5f5f68;
+  --text-dim: #b0b0b8;
+  --text-faint: #a0a0a8;
 
   /* accent (kept pink/red, used sparingly) */
   --accent: #ff0050;
@@ -100,7 +100,7 @@ body {
 .card {
   position: relative;
   background: linear-gradient(180deg, var(--surface), rgba(255, 255, 255, 0.01));
-  border: 1px solid var(--line);
+   border: 1px solid var(--line-strong);
   border-radius: var(--radius);
   padding: clamp(26px, 6vw, 44px);
   box-shadow:
@@ -182,7 +182,7 @@ select {
   width: 100%;
   padding: 14px 16px 14px 44px;
   background: var(--bg-soft);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   color: var(--text);
   font-size: 1rem;
@@ -203,8 +203,8 @@ select:hover {
 input[type="text"]:focus,
 select:focus {
   border-color: var(--accent-line);
-  background: #0c0c0f;
-  box-shadow: 0 0 0 3px var(--accent-soft);
+   background: var(--bg-soft);
+   box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 select {
@@ -215,7 +215,7 @@ select {
 }
 
 select option {
-  background-color: #141418;
+   background-color: var(--bg-soft);
   color: var(--text);
 }
 
@@ -327,7 +327,7 @@ select option {
   gap: 10px;
   padding: 14px 12px;
   background: var(--bg-soft);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   color: var(--text-dim);
   font-weight: 600;
@@ -478,9 +478,9 @@ button#downloadBtn:focus-visible {
   padding: 0;
   overflow: hidden;
   background: var(--bg-soft);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  color: var(--text-dim);
+   border: 1px solid var(--line-strong);
+   border-radius: var(--radius-sm);
+   color: var(--text-dim);
   font-family: inherit;
   font-size: 1rem;
   cursor: pointer;
@@ -617,9 +617,9 @@ button#downloadBtn:focus-visible {
   width: 40px;
   height: 22px;
   background: var(--bg-soft);
-  border: 1px solid var(--line);
-  border-radius: 11px;
-  transition: background var(--t), border-color var(--t);
+   border: 1px solid var(--line-strong);
+   border-radius: 11px;
+   transition: background var(--t), border-color var(--t);
 }
 
 .toggle-track::after {
