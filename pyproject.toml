@@ -1,0 +1,13 @@
+# only holds dev tooling and tool config. Runtime deps in requirements.txt.
+
+[dependency-groups]
+# dev/test tools, not runtime deps. install: pip install --group dev  (pip 25.1+)
+dev = [
+    "pytest",
+    "httpx",  # backs fastapi's TestClient
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# put the project root on sys.path so tests can `import app`
+pythonpath = ["."]
